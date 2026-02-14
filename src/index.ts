@@ -34,7 +34,7 @@ export async function run() {
 
 async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
   const providers = await setupProviders(env);
-  const theme = "oh-p-dark";
+  const theme = await selectTheme();
   return {
     providers,
     theme,
