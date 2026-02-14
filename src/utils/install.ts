@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 import type { OhPConfig } from "../types.js";
-import { KEYBINDING_SCHEMES, PROVIDERS } from "../types.js";
+import { KEYBINDING_SCHEMES, MODEL_CAPABILITIES, PROVIDERS } from "../types.js";
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -41,13 +41,18 @@ export function applyConfig(config: OhPConfig) {
   // 2. settings.json
   const primary = config.providers[0];
   const providerInfo = primary ? PROVIDERS[primary.name] : undefined;
+  const compactThreshold = config.compactThreshold ?? 0.75;
+  const primaryModel = primary?.defaultModel ?? providerInfo?.models[0];
+  const primaryCaps = primaryModel ? MODEL_CAPABILITIES[primaryModel] : undefined;
+  const contextWindow = primary?.contextWindow ?? primaryCaps?.contextWindow ?? 128000;
+  const reserveTokens = Math.round(contextWindow * (1 - compactThreshold));
   const settings: Record<string, unknown> = {
     defaultProvider: primary?.name,
-    defaultModel: primary?.defaultModel ?? providerInfo?.models[0],
+    defaultModel: primaryModel,
     defaultThinkingLevel: config.thinking,
     theme: config.theme,
     enableSkillCommands: true,
-    compaction: { enabled: true, reserveTokens: 16384, keepRecentTokens: 20000 },
+    compaction: { enabled: true, reserveTokens, keepRecentTokens: 20000 },
     retry: { enabled: true, maxRetries: 3 },
   };
   if (config.providers.length > 1) {
@@ -63,6 +68,7 @@ export function applyConfig(config: OhPConfig) {
   if (customProviders.length > 0) {
     const models: Record<string, unknown> = {};
     for (const cp of customProviders) {
+      const caps = cp.defaultModel ? MODEL_CAPABILITIES[cp.defaultModel] : undefined;
       models[cp.name] = {
         baseUrl: cp.baseUrl,
         apiKey: cp.apiKey === "none" ? undefined : cp.apiKey,
@@ -70,10 +76,10 @@ export function applyConfig(config: OhPConfig) {
         models: cp.defaultModel ? [{
           id: cp.defaultModel,
           name: cp.defaultModel,
-          reasoning: false,
-          input: ["text"],
-          contextWindow: 128000,
-          maxTokens: 8192,
+          reasoning: cp.reasoning ?? caps?.reasoning ?? false,
+          input: cp.multimodal ? ["text", "image"] : (caps?.input ?? ["text"]),
+          contextWindow: cp.contextWindow ?? caps?.contextWindow ?? 128000,
+          maxTokens: cp.maxTokens ?? caps?.maxTokens ?? 8192,
         }] : [],
       };
     }

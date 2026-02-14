@@ -3,6 +3,11 @@ export interface ProviderConfig {
   apiKey: string;
   defaultModel?: string;
   baseUrl?: string;
+  // Model capabilities (used for custom providers)
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  multimodal?: boolean;
 }
 
 export interface OhPConfig {
@@ -14,7 +19,37 @@ export interface OhPConfig {
   prompts: string[];
   agents: string;
   thinking: string;
+  compactThreshold?: number; // 0-1, fraction of context window to trigger compaction (default 0.75)
 }
+
+/** Official model capabilities for known providers */
+export interface ModelCapabilities {
+  contextWindow: number;
+  maxTokens: number;
+  reasoning: boolean;
+  input: ("text" | "image")[];
+}
+
+export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
+  // Anthropic
+  "claude-sonnet-4-20250514":  { contextWindow: 200000, maxTokens: 16384, reasoning: true,  input: ["text", "image"] },
+  "claude-opus-4-0520":        { contextWindow: 200000, maxTokens: 16384, reasoning: true,  input: ["text", "image"] },
+  // OpenAI
+  "gpt-4o":                    { contextWindow: 128000, maxTokens: 16384, reasoning: false, input: ["text", "image"] },
+  "o3-mini":                   { contextWindow: 128000, maxTokens: 65536, reasoning: true,  input: ["text"] },
+  // Google
+  "gemini-2.5-pro":            { contextWindow: 1048576, maxTokens: 65536, reasoning: true,  input: ["text", "image"] },
+  "gemini-2.5-flash":          { contextWindow: 1048576, maxTokens: 65536, reasoning: true,  input: ["text", "image"] },
+  // Groq
+  "llama-3.3-70b-versatile":   { contextWindow: 128000, maxTokens: 32768, reasoning: false, input: ["text"] },
+  // OpenRouter
+  "anthropic/claude-sonnet-4": { contextWindow: 200000, maxTokens: 16384, reasoning: true,  input: ["text", "image"] },
+  "openai/gpt-4o":             { contextWindow: 128000, maxTokens: 16384, reasoning: false, input: ["text", "image"] },
+  // xAI
+  "grok-3":                    { contextWindow: 131072, maxTokens: 16384, reasoning: false, input: ["text", "image"] },
+  // Mistral
+  "mistral-large-latest":      { contextWindow: 128000, maxTokens: 8192,  reasoning: false, input: ["text"] },
+};
 
 export const PROVIDERS: Record<string, { env: string; label: string; models: string[] }> = {
   anthropic:  { env: "ANTHROPIC_API_KEY",  label: "Anthropic (Claude)",     models: ["claude-sonnet-4-20250514", "claude-opus-4-0520"] },

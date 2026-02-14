@@ -16,6 +16,7 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
     `Theme:        ${chalk.cyan(config.theme)}`,
     `Keybindings:  ${chalk.cyan(config.keybindings)}`,
     `Thinking:     ${chalk.cyan(config.thinking)}`,
+    `Compaction:   ${chalk.cyan(`${Math.round((config.compactThreshold ?? 0.75) * 100)}% of context`)}`,
     `Extensions:   ${chalk.cyan(config.extensions.join(", ") || "none")}`,
     `Skills:       ${chalk.cyan(config.skills.join(", ") || "none")}`,
     `Prompts:      ${chalk.cyan(`${config.prompts.length} templates`)}`,

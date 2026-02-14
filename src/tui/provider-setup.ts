@@ -127,7 +127,56 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
   }
 
   p.log.success(`${name} configured (${baseUrl})`);
-  return { name, apiKey, defaultModel, baseUrl };
+
+  // Model capabilities (optional)
+  const wantCaps = await p.confirm({
+    message: "Configure model capabilities? (context window, multimodal, reasoning)",
+    initialValue: false,
+  });
+  if (p.isCancel(wantCaps)) { p.cancel("Cancelled."); process.exit(0); }
+
+  let contextWindow: number | undefined;
+  let maxTokens: number | undefined;
+  let reasoning: boolean | undefined;
+  let multimodal: boolean | undefined;
+
+  if (wantCaps) {
+    const ctxInput = await p.text({
+      message: "Context window size (tokens):",
+      placeholder: "128000",
+      initialValue: "128000",
+      validate: (v) => {
+        const n = Number(v);
+        if (isNaN(n) || n < 1024) return "Must be a number ≥ 1024";
+        return undefined;
+      },
+    });
+    if (p.isCancel(ctxInput)) { p.cancel("Cancelled."); process.exit(0); }
+    contextWindow = Number(ctxInput);
+
+    const maxTokInput = await p.text({
+      message: "Max output tokens:",
+      placeholder: "8192",
+      initialValue: "8192",
+      validate: (v) => {
+        const n = Number(v);
+        if (isNaN(n) || n < 256) return "Must be a number ≥ 256";
+        return undefined;
+      },
+    });
+    if (p.isCancel(maxTokInput)) { p.cancel("Cancelled."); process.exit(0); }
+    maxTokens = Number(maxTokInput);
+
+    const isMultimodal = await p.confirm({ message: "Supports image input (multimodal)?", initialValue: false });
+    if (p.isCancel(isMultimodal)) { p.cancel("Cancelled."); process.exit(0); }
+    multimodal = isMultimodal;
+
+    const isReasoning = await p.confirm({ message: "Supports extended thinking (reasoning)?", initialValue: false });
+    if (p.isCancel(isReasoning)) { p.cancel("Cancelled."); process.exit(0); }
+    reasoning = isReasoning;
+  }
+
+  return { name, apiKey, defaultModel, baseUrl, contextWindow, maxTokens, reasoning, multimodal };
 }
 
 async function selectModel(label: string, staticModels: string[], baseUrl?: string, apiKey?: string): Promise<string> {
