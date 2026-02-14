@@ -1,84 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#00d4aa"/>
       <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
-    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="100%" stop-color="#f43f5e"/>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="5" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
 
-  <!-- Background -->
-  <circle cx="256" cy="256" r="240" fill="#0f0f1a" stroke="url(#g1)" stroke-width="2.5" opacity="0.95"/>
-
-  <!-- Head — diamond -->
-  <polygon points="256,130 290,168 256,206 222,168" fill="url(#g1)" filter="url(#glow)"/>
-
-  <!-- Thorax — diamond (smaller, 3 pairs attach here) -->
-  <polygon points="256,218 284,250 256,282 228,250" fill="url(#g1)" filter="url(#glow)"/>
-
-  <!-- Petiole — narrow connector -->
-  <polygon points="256,284 264,296 256,308 248,296" fill="url(#g1)" opacity="0.8"/>
-
-  <!-- Abdomen — large diamond -->
-  <polygon points="256,310 300,360 256,410 212,360" fill="url(#g2)" filter="url(#glow)"/>
-
-  <!-- Eyes -->
-  <circle cx="246" cy="163" r="5" fill="#0f0f1a"/>
-  <circle cx="266" cy="163" r="5" fill="#0f0f1a"/>
-  <circle cx="247" cy="161.5" r="2" fill="#fff"/>
-  <circle cx="267" cy="161.5" r="2" fill="#fff"/>
+  <!-- Head -->
+  <circle cx="64" cy="36" r="14" fill="url(#g)"/>
+  <!-- Thorax -->
+  <circle cx="64" cy="62" r="10" fill="url(#g)"/>
+  <!-- Abdomen -->
+  <ellipse cx="64" cy="92" rx="16" ry="14" fill="#7c3aed"/>
 
   <!-- Antennae -->
-  <path d="M242 138 Q225 105 205 82" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="M270 138 Q287 105 307 82" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <circle cx="203" cy="80" r="4.5" fill="#00d4aa"/>
-  <circle cx="309" cy="80" r="4.5" fill="#00d4aa"/>
+  <line x1="56" y1="25" x2="42" y2="10" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="72" y1="25" x2="86" y2="10" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round"/>
 
-  <!-- Mandibles -->
-  <path d="M240 200 Q232 215 225 210" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M272 200 Q280 215 287 210" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <!-- Legs — 3 pairs from thorax -->
+  <line x1="54" y1="56" x2="34" y2="48" stroke="#00d4aa" stroke-width="2" stroke-linecap="round"/>
+  <line x1="74" y1="56" x2="94" y2="48" stroke="#00d4aa" stroke-width="2" stroke-linecap="round"/>
+  <line x1="54" y1="62" x2="30" y2="64" stroke="#00d4aa" stroke-width="2" stroke-linecap="round"/>
+  <line x1="74" y1="62" x2="98" y2="64" stroke="#00d4aa" stroke-width="2" stroke-linecap="round"/>
+  <line x1="54" y1="68" x2="34" y2="80" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+  <line x1="74" y1="68" x2="94" y2="80" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
 
-  <!-- === LEGS: 1 pair front (head), 1 pair middle (thorax), 2 pairs back (abdomen) === -->
-
-  <!-- Front pair — from head-thorax joint -->
-  <path d="M228 210 Q195 195 162 188" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M162 188 Q155 195 148 205" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M284 210 Q317 195 350 188" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M350 188 Q357 195 364 205" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-  <!-- Middle pair — from thorax center -->
-  <path d="M228 250 Q190 252 158 260" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M158 260 Q150 270 145 282" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M284 250 Q322 252 354 260" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M354 260 Q362 270 367 282" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-  <!-- Back pair 1 — from abdomen upper -->
-  <path d="M220 340 Q185 335 158 342" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M158 342 Q148 352 140 368" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M292 340 Q327 335 354 342" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M354 342 Q364 352 372 368" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-  <!-- Back pair 2 — from abdomen lower -->
-  <path d="M224 372 Q192 385 168 400" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M168 400 Q162 410 158 425" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M288 372 Q320 385 344 400" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M344 400 Q350 410 354 425" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-  <!-- Pheromone particles -->
-  <circle cx="120" cy="175" r="2.5" fill="#00d4aa" opacity="0.5"/>
-  <circle cx="108" cy="305" r="2" fill="#7c3aed" opacity="0.4"/>
-  <circle cx="392" cy="190" r="2" fill="#00d4aa" opacity="0.4"/>
-  <circle cx="400" cy="340" r="2.5" fill="#f43f5e" opacity="0.35"/>
-  <circle cx="135" cy="430" r="2" fill="#7c3aed" opacity="0.35"/>
-  <circle cx="378" cy="432" r="2" fill="#00d4aa" opacity="0.4"/>
+  <!-- Eyes -->
+  <circle cx="59" cy="34" r="2.5" fill="#0f0f1a"/>
+  <circle cx="69" cy="34" r="2.5" fill="#0f0f1a"/>
 
   <!-- Text -->
-  <text x="256" y="478" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="38" fill="url(#g1)" letter-spacing="4">oh-pi</text>
+  <text x="64" y="122" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="14" fill="url(#g)">oh-pi</text>
 </svg>
