@@ -1,179 +1,191 @@
-# oh-pi!
+<div align="center">
 
-> One-click setup for [pi-coding-agent](https://github.com/badlogic/pi-mono). Like oh-my-zsh for pi.
+# 🐜 oh-pi
+
+**One command to supercharge [pi-coding-agent](https://github.com/badlogic/pi-mono).**
+
+Like oh-my-zsh for pi — but with an autonomous ant colony.
+
+[![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
+[![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
+[![node](https://img.shields.io/node/v/oh-pi)](https://nodejs.org)
 
 ```bash
 npx oh-pi
 ```
 
-## What it does
+</div>
 
-oh-pi! is a modern interactive TUI that configures pi-coding-agent in minutes:
+---
 
-- **API Key Setup** — Multi-provider configuration with validation (Anthropic, OpenAI, Google, Groq, OpenRouter, xAI, Mistral)
-- **Preset Profiles** — Pre-made configs for different roles (Developer, Security, Data/AI, Colony Operator, Minimal)
-- **Custom Themes** — 6 beautiful themes (oh-pi Dark, Cyberpunk, Nord, Catppuccin, Tokyo Night, Gruvbox)
-- **Prompt Templates** — 10 ready-to-use templates (/review, /fix, /commit, /test, /security, etc.)
-- **Extensions** — Safety guards, git checkpoints, auto session naming, ant colony swarm
-- **Skills** — Debug helper, git workflow, quick project setup, ant colony orchestration
-- **Keybindings** — Default, Vim, or Emacs schemes
-- **AGENTS.md** — Role-specific project guidelines
-- **🐜 Ant Colony** — Autonomous multi-agent swarm with adaptive concurrency
+## Why
+
+pi-coding-agent is powerful out of the box. But configuring providers, themes, extensions, skills, and prompts by hand is tedious. oh-pi gives you a modern TUI that does it all in under a minute — and ships an **ant colony swarm** that turns pi into a multi-agent system.
 
 ## Quick Start
 
 ```bash
-# Run the configurator
-npx oh-pi
+npx oh-pi    # configure everything
+pi           # start coding
+```
 
-# Then start coding
-pi
+That's it. oh-pi detects your environment, walks you through setup, and writes `~/.pi/agent/` for you.
+
+Already have a config? oh-pi detects it and offers **backup before overwriting**.
+
+## What You Get
+
+```
+~/.pi/agent/
+├── auth.json            API keys (0600 permissions)
+├── settings.json        Model, theme, thinking level
+├── keybindings.json     Vim/Emacs shortcuts (optional)
+├── AGENTS.md            Role-specific AI guidelines
+├── extensions/          4 extensions
+│   ├── safe-guard       Dangerous command confirmation + path protection
+│   ├── git-guard        Auto stash checkpoints + dirty repo warning
+│   ├── auto-session     Session naming from first message
+│   └── ant-colony/      🐜 Autonomous multi-agent swarm
+├── prompts/             10 templates (/review /fix /commit /test ...)
+├── skills/              4 skills (debug, git, setup, colony)
+└── themes/              6 custom themes
 ```
 
 ## Setup Modes
 
-### 🚀 Quick Setup (3 steps)
-1. Pick your API provider(s)
-2. Enter API key(s)
-3. Done — sensible defaults applied
+| Mode | Steps | For |
+|------|-------|-----|
+| 🚀 **Quick** | 3 | Pick provider → enter key → done |
+| 📦 **Preset** | 2 | Choose a role profile → enter key |
+| 🎛️ **Custom** | 6 | Pick everything yourself |
 
-### 📦 Preset
-Choose a pre-made profile:
+### Presets
 
-| Preset | Theme | Thinking | Focus |
-|--------|-------|----------|-------|
-| 🟢 Starter | oh-pi Dark | medium | Basic safety + git |
+| | Theme | Thinking | Includes |
+|---|-------|----------|----------|
+| 🟢 Starter | oh-pi Dark | medium | Safety + git basics |
 | 🔵 Pro Developer | Catppuccin | high | Full toolchain |
 | 🟣 Security Researcher | Cyberpunk | high | Audit + pentesting |
-| 🟠 Data & AI Engineer | Tokyo Night | medium | MLOps + pipelines |
-| 🔴 Minimal | Pi Default | off | Core only |
+| 🟠 Data & AI | Tokyo Night | medium | MLOps + pipelines |
+| 🔴 Minimal | Default | off | Core only |
 | ⚫ Full Power | oh-pi Dark | high | Everything + ant colony |
 
-### 🎛️ Custom
-Pick every option yourself: providers, theme, keybindings, extensions, skills, AGENTS.md template.
+### Providers
+
+Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral
+
+Auto-detects API keys from environment variables.
 
 ## 🐜 Ant Colony
 
-Autonomous multi-agent swarm built as a pi extension. Modeled after real ant colony behavior.
-
-### How it works
+The headline feature. A multi-agent swarm modeled after real ant ecology.
 
 ```
-Goal → 🔍 Scouts explore → 📋 Task pool generated → ⚒️ Workers execute in parallel → 🛡️ Soldiers review → ✅ Done
+You: "Refactor auth from sessions to JWT"
+
+oh-pi:
+  🔍 Scout ants explore codebase (haiku — fast, cheap)
+  📋 Task pool generated from discoveries
+  ⚒️  Worker ants execute in parallel (sonnet — capable)
+  🛡️ Soldier ants review all changes (sonnet — thorough)
+  ✅ Done — summary report with metrics
 ```
 
-- **Scouts** (haiku) — Fast codebase recon, identify targets
-- **Workers** (sonnet) — Execute tasks, can spawn sub-tasks
-- **Soldiers** (sonnet) — Review quality, request fixes if needed
+### Why ants?
 
-### Key features
+Real ant colonies solve complex problems without central control. Each ant follows simple rules, communicates through **pheromone trails**, and the colony self-organizes. oh-pi maps this directly:
 
-- **Auto-trigger** — LLM automatically deploys colony for complex multi-file tasks
-- **Adaptive concurrency** — Starts at 1, explores throughput ceiling, stabilizes at optimal
-- **429 backoff** — Rate limits trigger exponential backoff (15s→30s→60s) + concurrency halving
-- **Pheromone communication** — Ants share discoveries via file-based pheromone trails (10min half-life)
-- **File locking** — One ant per file, blocked tasks auto-resume when locks release
+| Real Ants | oh-pi |
+|-----------|-------|
+| Scout finds food | Scout scans codebase, identifies targets |
+| Pheromone trail | `.ant-colony/pheromone.jsonl` — shared discoveries |
+| Worker carries food | Worker executes task on assigned files |
+| Soldier guards nest | Soldier reviews changes, requests fixes |
+| More food → more ants | More tasks → higher concurrency (auto-adapted) |
+| Pheromone evaporates | 10-minute half-life — stale info fades |
 
-### Usage
+### Auto-trigger
 
-```bash
-# LLM auto-triggers for complex tasks
-"Refactor the auth system from sessions to JWT"
+The LLM decides when to deploy the colony. You don't have to think about it:
 
-# Manual command
+- **≥3 files** need changes → colony
+- **Parallel workstreams** possible → colony
+- **Single file** change → direct execution (no colony overhead)
+
+Or trigger manually:
+
+```
 /colony migrate the entire project from CJS to ESM
-
-# Shortcut
-Ctrl+Alt+A
 ```
 
-## What Gets Installed
+### Adaptive Concurrency
+
+The colony automatically finds the optimal parallelism for your machine:
 
 ```
-~/.pi/agent/
-├── auth.json          # API keys (0600 permissions)
-├── settings.json      # Model, theme, thinking level
-├── keybindings.json   # Vim/Emacs shortcuts (if selected)
-├── AGENTS.md          # Project guidelines for the AI
-├── extensions/        # Safety guards, git tools, ant colony
-├── prompts/           # /review, /fix, /commit, /test, etc.
-├── skills/            # debug-helper, git-workflow, ant-colony
-└── themes/            # Custom color themes
+Cold start     →  1-2 ants (conservative)
+Exploration    →  +1 each wave, monitoring throughput
+Throughput ↓   →  lock optimal, stabilize
+CPU > 85%      →  reduce immediately
+429 rate limit →  halve concurrency + exponential backoff (15s→30s→60s)
+Tasks done     →  scale down to minimum
 ```
 
-Existing config? oh-pi! detects it and offers backup before overwriting.
+### File Safety
 
-## Included Resources
+One ant per file. Always. Conflicting tasks are automatically blocked and resume when locks release.
 
-### Themes
+## Themes
 
-| Theme | Style |
-|-------|-------|
-| oh-pi Dark | Cyan + Purple, high contrast |
-| Cyberpunk | Neon magenta + electric cyan |
-| Nord | Arctic blue palette |
-| Catppuccin Mocha | Pastel colors on dark |
-| Tokyo Night | Blue + purple twilight |
-| Gruvbox Dark | Warm retro tones |
+| | |
+|---|---|
+| 🌙 **oh-pi Dark** | Cyan + purple, high contrast |
+| 🌙 **Cyberpunk** | Neon magenta + electric cyan |
+| 🌙 **Nord** | Arctic blue palette |
+| 🌙 **Catppuccin Mocha** | Pastel on dark |
+| 🌙 **Tokyo Night** | Blue + purple twilight |
+| 🌙 **Gruvbox Dark** | Warm retro tones |
 
-### Prompt Templates
+## Prompt Templates
 
-| Command | Description |
-|---------|-------------|
-| `/review` | Code review: bugs, security, performance |
-| `/fix` | Fix errors with minimal changes |
-| `/explain` | Explain code from simple to detailed |
-| `/refactor` | Refactor while preserving behavior |
-| `/test` | Generate tests for code |
-| `/commit` | Conventional Commit message |
-| `/pr` | Pull request description |
-| `/security` | OWASP security audit |
-| `/optimize` | Performance optimization |
-| `/document` | Generate documentation |
+```
+/review    Code review: bugs, security, performance
+/fix       Fix errors with minimal changes
+/explain   Explain code, simple to detailed
+/refactor  Refactor preserving behavior
+/test      Generate tests
+/commit    Conventional Commit message
+/pr        Pull request description
+/security  OWASP security audit
+/optimize  Performance optimization
+/document  Generate documentation
+```
 
-### Extensions
+## AGENTS.md Templates
 
-| Extension | Description |
-|-----------|-------------|
-| Safe Guard | Confirms dangerous commands (rm -rf, DROP, etc.) + protects .env, .git/ |
-| Git Guard | Auto stash checkpoints + dirty repo warning + completion notification |
-| Auto Session Name | Names sessions from first message |
-| 🐜 Ant Colony | Autonomous multi-agent swarm with adaptive concurrency |
-
-### Skills
-
-| Skill | Description |
-|-------|-------------|
-| `/skill:quick-setup` | Detect project type, generate .pi/ config |
-| `/skill:debug-helper` | Error analysis, log interpretation, profiling |
-| `/skill:git-workflow` | Branch strategy, PR workflow, conflict resolution |
-| `/skill:ant-colony` | Colony orchestration strategies and tuning |
-
-### AGENTS.md Templates
-
-| Template | Description |
-|----------|-------------|
+| Template | Focus |
+|----------|-------|
 | General Developer | Universal coding guidelines |
-| Full-Stack Developer | Frontend + Backend + DB |
+| Full-Stack Developer | Frontend + backend + DB |
 | Security Researcher | Pentesting & audit |
 | Data & AI Engineer | MLOps & pipelines |
-| 🐜 Colony Operator | Ant swarm multi-agent orchestration |
+| 🐜 Colony Operator | Multi-agent orchestration |
 
 ## Also a Pi Package
 
-oh-pi! is also a pi package. Install just the resources without the configurator:
+Skip the configurator, just install the resources:
 
 ```bash
 pi install npm:oh-pi
 ```
 
-This adds all themes, prompts, skills, and extensions to your pi setup.
+Adds all themes, prompts, skills, and extensions to your existing pi setup.
 
 ## Requirements
 
-- Node.js >= 20
-- pi-coding-agent (installed automatically if missing)
+- Node.js ≥ 20
 - At least one LLM API key
+- pi-coding-agent (installed automatically if missing)
 
 ## License
 
