@@ -12,7 +12,7 @@ oh-pi! is a modern interactive TUI that configures pi-coding-agent in minutes:
 
 - **API Key Setup** — Multi-provider configuration with validation (Anthropic, OpenAI, Google, Groq, OpenRouter, xAI, Mistral)
 - **Preset Profiles** — Pre-made configs for different roles (Developer, Security, Data/AI, Colony Operator, Minimal)
-- **Custom Themes** — 6 beautiful themes (oh-p! Dark, Cyberpunk, Nord, Catppuccin, Tokyo Night, Gruvbox)
+- **Custom Themes** — 6 beautiful themes (oh-pi Dark, Cyberpunk, Nord, Catppuccin, Tokyo Night, Gruvbox)
 - **Prompt Templates** — 10 ready-to-use templates (/review, /fix, /commit, /test, /security, etc.)
 - **Extensions** — Safety guards, git checkpoints, auto session naming, ant colony swarm
 - **Skills** — Debug helper, git workflow, quick project setup, ant colony orchestration
@@ -42,12 +42,12 @@ Choose a pre-made profile:
 
 | Preset | Theme | Thinking | Focus |
 |--------|-------|----------|-------|
-| 🟢 Starter | oh-p! Dark | medium | Basic safety + git |
+| 🟢 Starter | oh-pi Dark | medium | Basic safety + git |
 | 🔵 Pro Developer | Catppuccin | high | Full toolchain |
 | 🟣 Security Researcher | Cyberpunk | high | Audit + pentesting |
 | 🟠 Data & AI Engineer | Tokyo Night | medium | MLOps + pipelines |
 | 🔴 Minimal | Pi Default | off | Core only |
-| ⚫ Full Power | oh-p! Dark | high | Everything + ant colony |
+| ⚫ Full Power | oh-pi Dark | high | Everything + ant colony |
 
 ### 🎛️ Custom
 Pick every option yourself: providers, theme, keybindings, extensions, skills, AGENTS.md template.
@@ -109,7 +109,7 @@ Existing config? oh-pi! detects it and offers backup before overwriting.
 
 | Theme | Style |
 |-------|-------|
-| oh-p! Dark | Cyan + Purple, high contrast |
+| oh-pi Dark | Cyan + Purple, high contrast |
 | Cyberpunk | Neon magenta + electric cyan |
 | Nord | Arctic blue palette |
 | Catppuccin Mocha | Pastel colors on dark |

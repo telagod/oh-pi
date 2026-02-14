@@ -1,5 +1,5 @@
 /**
- * oh-p! Auto Session Name Extension
+ * oh-pi Auto Session Name Extension
  *
  * Automatically names sessions based on the first user message.
  */

@@ -1,5 +1,5 @@
 /**
- * oh-p! Safe Guard Extension
+ * oh-pi Safe Guard Extension
  * 
  * Combines destructive command confirmation + protected paths in one extension.
  */

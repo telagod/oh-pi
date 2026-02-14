@@ -26,7 +26,7 @@ export const PROVIDERS: Record<string, { env: string; label: string; models: str
 };
 
 export const THEMES = [
-  { name: "oh-p-dark",        label: "oh-p! Dark (Cyan+Purple)",   style: "dark" },
+  { name: "oh-p-dark",        label: "oh-pi Dark (Cyan+Purple)",   style: "dark" },
   { name: "cyberpunk",        label: "Cyberpunk (Neon)",           style: "dark" },
   { name: "nord",             label: "Nord (Arctic)",              style: "dark" },
   { name: "catppuccin-mocha", label: "Catppuccin Mocha (Pastel)",  style: "dark" },

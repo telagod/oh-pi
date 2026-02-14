@@ -81,9 +81,9 @@ CLI flags > 项目 .pi/settings.json > 全局 ~/.pi/agent/settings.json
 --api-key > auth.json > 环境变量 > models.json
 ```
 
-## 对 oh-p! 项目的价值
+## 对 oh-pi 项目的价值
 
-本文档为 oh-p!（一键配置 pi-coding-agent 的项目）提供完整的知识基础：
+本文档为 oh-pi（一键配置 pi-coding-agent 的项目）提供完整的知识基础：
 
 1. **配置项全览** — 知道 settings.json 所有字段，可生成交互式配置
 2. **目录结构** — 知道 `~/.pi/agent/` 和 `.pi/` 下每个文件的作用

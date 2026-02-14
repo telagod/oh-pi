@@ -1,5 +1,5 @@
 /**
- * oh-p! Git Checkpoint Extension
+ * oh-pi Git Checkpoint Extension
  *
  * Auto-stash before each turn, notify on agent completion.
  * Combines git-checkpoint + notify + dirty-repo-guard.
@@ -39,7 +39,7 @@ export default function (pi: ExtensionAPI) {
 
   // Notify when agent is done
   pi.on("agent_end", async () => {
-    terminalNotify("oh-p!", `Done after ${turnCount} turn(s). Ready for input.`);
+    terminalNotify("oh-pi", `Done after ${turnCount} turn(s). Ready for input.`);
     turnCount = 0;
   });
 }

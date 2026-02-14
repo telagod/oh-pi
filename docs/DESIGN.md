@@ -1,16 +1,16 @@
-# oh-p! 产品设计文档
+# oh-pi 产品设计文档
 
 > 一键配置 pi-coding-agent 的交互式 TUI 工具
 
 ## 一、产品定位
 
-**oh-p!** 是 pi-coding-agent 的"开箱即用配置器"。用户运行 `npx oh-pi` 后，通过交互式 TUI 完成：
+**oh-pi** 是 pi-coding-agent 的"开箱即用配置器"。用户运行 `npx oh-pi` 后，通过交互式 TUI 完成：
 - API 接入（多提供商一站式配置）
 - 预置扩展/技能/主题安装
 - 个性化偏好设定
 - 一键生成完整的 `~/.pi/agent/` 配置
 
-类比：oh-my-zsh 之于 zsh，oh-p! 之于 pi。
+类比：oh-my-zsh 之于 zsh，oh-pi 之于 pi。
 
 ## 二、交互流程设计
 
@@ -223,7 +223,7 @@ MCP: 全部预置 MCP
 | `pr-context-packer` | pi-shit | PR 上下文打包 |
 | `code-simplifier` | pi-shit | 代码简化 |
 
-#### oh-p! 自研技能
+#### oh-pi 自研技能
 
 | 技能 | 说明 |
 |------|------|
@@ -266,7 +266,7 @@ MCP: 全部预置 MCP
 
 ### 4.5 MCP 服务器预置
 
-Pi 本身不内置 MCP，但可通过 Extension 桥接。oh-p! 提供 MCP 桥接扩展 + 预置服务器配置：
+Pi 本身不内置 MCP，但可通过 Extension 桥接。oh-pi 提供 MCP 桥接扩展 + 预置服务器配置：
 
 | MCP 服务器 | 说明 | 安装方式 |
 |------------|------|----------|
@@ -380,7 +380,7 @@ Authorized security researcher with full access to local/CTF/lab environments.
 ### 5.1 项目结构
 
 ```
-oh-p!/
+oh-pi/
 ├── package.json
 ├── bin/
 │   └── oh-pi.ts                    # CLI 入口
