@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./logo.svg" width="180" alt="oh-pi logo"/>
+
 # 🐜 oh-pi
 
 **One command to supercharge [pi-coding-agent](https://github.com/badlogic/pi-mono).**

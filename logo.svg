@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d4aa"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#0f0f1a" stroke="url(#g1)" stroke-width="3" opacity="0.95"/>
+
+  <!-- Ant body — minimal geometric -->
+  <!-- Head -->
+  <ellipse cx="256" cy="175" rx="38" ry="35" fill="url(#g1)" filter="url(#glow)"/>
+  <!-- Thorax -->
+  <ellipse cx="256" cy="255" rx="32" ry="30" fill="url(#g1)" filter="url(#glow)"/>
+  <!-- Abdomen -->
+  <ellipse cx="256" cy="345" rx="44" ry="42" fill="url(#g2)" filter="url(#glow)"/>
+
+  <!-- Eyes -->
+  <circle cx="242" cy="168" r="6" fill="#0f0f1a"/>
+  <circle cx="270" cy="168" r="6" fill="#0f0f1a"/>
+  <circle cx="243" cy="166" r="2.5" fill="#fff"/>
+  <circle cx="271" cy="166" r="2.5" fill="#fff"/>
+
+  <!-- Antennae -->
+  <path d="M244 145 Q230 105 210 85" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M268 145 Q282 105 302 85" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <circle cx="208" cy="83" r="5" fill="#00d4aa"/>
+  <circle cx="304" cy="83" r="5" fill="#00d4aa"/>
+
+  <!-- Legs — 3 pairs, clean lines -->
+  <!-- Front -->
+  <path d="M228 245 Q195 225 165 215" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M284 245 Q317 225 347 215" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Middle -->
+  <path d="M225 260 Q185 265 155 275" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M287 260 Q327 265 357 275" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Back -->
+  <path d="M230 340 Q195 365 170 385" stroke="url(#g2)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M282 340 Q317 365 342 385" stroke="url(#g2)" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+  <!-- Pheromone dots — orbiting particles -->
+  <circle cx="130" cy="180" r="3" fill="#00d4aa" opacity="0.6"/>
+  <circle cx="115" cy="310" r="2.5" fill="#7c3aed" opacity="0.5"/>
+  <circle cx="385" cy="195" r="2.5" fill="#00d4aa" opacity="0.5"/>
+  <circle cx="395" cy="330" r="3" fill="#f43f5e" opacity="0.4"/>
+  <circle cx="150" cy="420" r="2" fill="#7c3aed" opacity="0.4"/>
+  <circle cx="365" cy="415" r="2" fill="#00d4aa" opacity="0.5"/>
+  <circle cx="180" cy="130" r="2" fill="#f43f5e" opacity="0.3"/>
+  <circle cx="340" cy="120" r="2" fill="#7c3aed" opacity="0.3"/>
+
+  <!-- Text -->
+  <text x="256" y="455" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="42" fill="url(#g1)" letter-spacing="3">oh-pi</text>
+</svg>
