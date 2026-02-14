@@ -1,6 +1,8 @@
 import * as p from "@clack/prompts";
 import chalk from "chalk";
+import { t } from "../i18n.js";
 import { PROVIDERS, type ProviderConfig } from "../types.js";
+import type { EnvInfo } from "../utils/detect.js";
 
 /** Fetch models from OpenAI-compatible /v1/models endpoint */
 async function fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {
@@ -16,19 +18,32 @@ async function fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {
   } catch { return []; }
 }
 
-export async function setupProviders(): Promise<ProviderConfig[]> {
+export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
   const entries = Object.entries(PROVIDERS);
 
+  // Detect existing providers and offer import
+  const detected = env?.existingProviders ?? [];
+  const knownDetected = detected.filter(p => p in PROVIDERS);
+  let initialValues = ["anthropic"];
+  if (knownDetected.length > 0) {
+    const useExisting = await p.confirm({
+      message: t("provider.detected", { list: knownDetected.join(", ") }),
+      initialValue: true,
+    });
+    if (p.isCancel(useExisting)) { p.cancel(t("cancelled")); process.exit(0); }
+    if (useExisting) initialValues = knownDetected;
+  }
+
   const selected = await p.multiselect({
-    message: "Select API providers",
+    message: t("provider.select"),
     options: [
       ...entries.map(([key, info]) => ({ value: key, label: info.label, hint: info.env })),
-      { value: "_custom", label: "🔧 Custom endpoint", hint: "Ollama, vLLM, LiteLLM, any OpenAI-compatible" },
+      { value: "_custom", label: t("provider.custom"), hint: t("provider.customHint") },
     ],
-    initialValues: ["anthropic"],
+    initialValues,
     required: true,
   });
-  if (p.isCancel(selected)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(selected)) { p.cancel(t("cancelled")); process.exit(0); }
 
   const configs: ProviderConfig[] = [];
 
@@ -44,8 +59,8 @@ export async function setupProviders(): Promise<ProviderConfig[]> {
 
     let apiKey: string;
     if (envVal) {
-      const useEnv = await p.confirm({ message: `Found ${chalk.cyan(info.env)} in environment. Use it?` });
-      if (p.isCancel(useEnv)) { p.cancel("Cancelled."); process.exit(0); }
+      const useEnv = await p.confirm({ message: t("provider.foundEnv", { env: chalk.cyan(info.env) }) });
+      if (p.isCancel(useEnv)) { p.cancel(t("cancelled")); process.exit(0); }
       apiKey = useEnv ? info.env : await promptKey(info.label);
     } else {
       apiKey = await promptKey(info.label);
@@ -53,19 +68,19 @@ export async function setupProviders(): Promise<ProviderConfig[]> {
 
     // Ask for custom base URL (optional)
     const wantCustomUrl = await p.confirm({
-      message: `Custom endpoint for ${info.label}? (proxy, Azure, etc.)`,
+      message: t("provider.customEndpoint", { label: info.label }),
       initialValue: false,
     });
-    if (p.isCancel(wantCustomUrl)) { p.cancel("Cancelled."); process.exit(0); }
+    if (p.isCancel(wantCustomUrl)) { p.cancel(t("cancelled")); process.exit(0); }
 
     let baseUrl: string | undefined;
     if (wantCustomUrl) {
       const url = await p.text({
-        message: `Base URL for ${info.label}:`,
-        placeholder: "https://your-proxy.example.com",
-        validate: (v) => (!v || !v.startsWith("http")) ? "Must be a valid URL" : undefined,
+        message: t("provider.baseUrl", { label: info.label }),
+        placeholder: t("provider.baseUrlPlaceholder"),
+        validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : undefined,
       });
-      if (p.isCancel(url)) { p.cancel("Cancelled."); process.exit(0); }
+      if (p.isCancel(url)) { p.cancel(t("cancelled")); process.exit(0); }
       baseUrl = url;
     }
 
@@ -73,7 +88,7 @@ export async function setupProviders(): Promise<ProviderConfig[]> {
     const defaultModel = await selectModel(info.label, info.models, baseUrl, apiKey);
 
     configs.push({ name, apiKey, defaultModel, ...(baseUrl ? { baseUrl } : {}) });
-    p.log.success(`${info.label} configured`);
+    p.log.success(t("provider.configured", { label: info.label }));
   }
 
   return configs;
@@ -81,21 +96,21 @@ export async function setupProviders(): Promise<ProviderConfig[]> {
 
 async function setupCustomProvider(): Promise<ProviderConfig | null> {
   const name = await p.text({
-    message: "Provider name:",
-    placeholder: "ollama",
-    validate: (v) => (!v || v.trim().length === 0) ? "Name required" : undefined,
+    message: t("provider.name"),
+    placeholder: t("provider.namePlaceholder"),
+    validate: (v) => (!v || v.trim().length === 0) ? t("provider.nameRequired") : undefined,
   });
-  if (p.isCancel(name)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(name)) { p.cancel(t("cancelled")); process.exit(0); }
 
   const baseUrl = await p.text({
-    message: "Base URL:",
-    placeholder: "http://localhost:11434",
-    validate: (v) => (!v || !v.startsWith("http")) ? "Must be a valid URL" : undefined,
+    message: t("provider.baseUrlCustom"),
+    placeholder: t("provider.baseUrlCustomPlaceholder"),
+    validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : undefined,
   });
-  if (p.isCancel(baseUrl)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(baseUrl)) { p.cancel(t("cancelled")); process.exit(0); }
 
-  const needsKey = await p.confirm({ message: "Requires API key?", initialValue: false });
-  if (p.isCancel(needsKey)) { p.cancel("Cancelled."); process.exit(0); }
+  const needsKey = await p.confirm({ message: t("provider.needsKey"), initialValue: false });
+  if (p.isCancel(needsKey)) { p.cancel(t("cancelled")); process.exit(0); }
 
   let apiKey = "none";
   if (needsKey) {
@@ -104,36 +119,36 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
 
   // Dynamic model fetch
   const s = p.spinner();
-  s.start(`Fetching models from ${baseUrl}`);
+  s.start(t("provider.fetchingModels", { source: baseUrl }));
   const models = await fetchModels(baseUrl, apiKey);
-  s.stop(models.length > 0 ? `Found ${models.length} models` : "No models found via API");
+  s.stop(models.length > 0 ? t("provider.foundModels", { count: models.length }) : t("provider.noModels"));
 
   let defaultModel: string | undefined;
   if (models.length > 0) {
     const model = await p.select({
-      message: `Default model for ${name}:`,
+      message: t("provider.selectModel", { label: name }),
       options: models.slice(0, 30).map(m => ({ value: m, label: m })),
     });
-    if (p.isCancel(model)) { p.cancel("Cancelled."); process.exit(0); }
+    if (p.isCancel(model)) { p.cancel(t("cancelled")); process.exit(0); }
     defaultModel = model;
   } else {
     const model = await p.text({
-      message: `Model name for ${name}:`,
-      placeholder: "llama3.1:8b",
-      validate: (v) => (!v || v.trim().length === 0) ? "Model name required" : undefined,
+      message: t("provider.modelName", { label: name }),
+      placeholder: t("provider.modelNamePlaceholder"),
+      validate: (v) => (!v || v.trim().length === 0) ? t("provider.modelNameRequired") : undefined,
     });
-    if (p.isCancel(model)) { p.cancel("Cancelled."); process.exit(0); }
+    if (p.isCancel(model)) { p.cancel(t("cancelled")); process.exit(0); }
     defaultModel = model;
   }
 
-  p.log.success(`${name} configured (${baseUrl})`);
+  p.log.success(t("provider.customConfigured", { name, url: baseUrl }));
 
   // Model capabilities (optional)
   const wantCaps = await p.confirm({
-    message: "Configure model capabilities? (context window, multimodal, reasoning)",
+    message: t("provider.configureCaps"),
     initialValue: false,
   });
-  if (p.isCancel(wantCaps)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(wantCaps)) { p.cancel(t("cancelled")); process.exit(0); }
 
   let contextWindow: number | undefined;
   let maxTokens: number | undefined;
@@ -142,37 +157,37 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
 
   if (wantCaps) {
     const ctxInput = await p.text({
-      message: "Context window size (tokens):",
+      message: t("provider.contextWindow"),
       placeholder: "128000",
       initialValue: "128000",
       validate: (v) => {
         const n = Number(v);
-        if (isNaN(n) || n < 1024) return "Must be a number ≥ 1024";
+        if (isNaN(n) || n < 1024) return t("provider.contextWindowValidation");
         return undefined;
       },
     });
-    if (p.isCancel(ctxInput)) { p.cancel("Cancelled."); process.exit(0); }
+    if (p.isCancel(ctxInput)) { p.cancel(t("cancelled")); process.exit(0); }
     contextWindow = Number(ctxInput);
 
     const maxTokInput = await p.text({
-      message: "Max output tokens:",
+      message: t("provider.maxTokens"),
       placeholder: "8192",
       initialValue: "8192",
       validate: (v) => {
         const n = Number(v);
-        if (isNaN(n) || n < 256) return "Must be a number ≥ 256";
+        if (isNaN(n) || n < 256) return t("provider.maxTokensValidation");
         return undefined;
       },
     });
-    if (p.isCancel(maxTokInput)) { p.cancel("Cancelled."); process.exit(0); }
+    if (p.isCancel(maxTokInput)) { p.cancel(t("cancelled")); process.exit(0); }
     maxTokens = Number(maxTokInput);
 
-    const isMultimodal = await p.confirm({ message: "Supports image input (multimodal)?", initialValue: false });
-    if (p.isCancel(isMultimodal)) { p.cancel("Cancelled."); process.exit(0); }
+    const isMultimodal = await p.confirm({ message: t("provider.multimodal"), initialValue: false });
+    if (p.isCancel(isMultimodal)) { p.cancel(t("cancelled")); process.exit(0); }
     multimodal = isMultimodal;
 
-    const isReasoning = await p.confirm({ message: "Supports extended thinking (reasoning)?", initialValue: false });
-    if (p.isCancel(isReasoning)) { p.cancel("Cancelled."); process.exit(0); }
+    const isReasoning = await p.confirm({ message: t("provider.reasoning"), initialValue: false });
+    if (p.isCancel(isReasoning)) { p.cancel(t("cancelled")); process.exit(0); }
     reasoning = isReasoning;
   }
 
@@ -185,27 +200,27 @@ async function selectModel(label: string, staticModels: string[], baseUrl?: stri
   // Try dynamic fetch if custom URL or known provider
   if (baseUrl && apiKey) {
     const s = p.spinner();
-    s.start(`Fetching models from ${label}`);
+    s.start(t("provider.fetchingModels", { source: label }));
     const fetched = await fetchModels(baseUrl, apiKey);
-    s.stop(fetched.length > 0 ? `Found ${fetched.length} models` : "Using default model list");
+    s.stop(fetched.length > 0 ? t("provider.foundModels", { count: fetched.length }) : t("provider.defaultModelList"));
     if (fetched.length > 0) models = fetched;
   }
 
   if (models.length === 1) return models[0];
 
   const model = await p.select({
-    message: `Default model for ${label}:`,
+    message: t("provider.selectModel", { label }),
     options: models.slice(0, 30).map(m => ({ value: m, label: m })),
   });
-  if (p.isCancel(model)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(model)) { p.cancel(t("cancelled")); process.exit(0); }
   return model;
 }
 
 async function promptKey(label: string): Promise<string> {
   const key = await p.password({
-    message: `API key for ${label}:`,
-    validate: (v) => (!v || v.trim().length === 0) ? "API key cannot be empty" : undefined,
+    message: t("provider.apiKey", { label }),
+    validate: (v) => (!v || v.trim().length === 0) ? t("provider.apiKeyRequired") : undefined,
   });
-  if (p.isCancel(key)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(key)) { p.cancel(t("cancelled")); process.exit(0); }
   return key;
 }

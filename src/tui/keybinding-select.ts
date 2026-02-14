@@ -1,14 +1,15 @@
 import * as p from "@clack/prompts";
+import { t } from "../i18n.js";
 
 export async function selectKeybindings(): Promise<string> {
   const kb = await p.select({
-    message: "Keybinding scheme:",
+    message: t("kb.select"),
     options: [
-      { value: "default", label: "⌨️  Default",  hint: "Pi standard keybindings" },
-      { value: "vim",     label: "🟢 Vim",      hint: "Alt+hjkl navigation" },
-      { value: "emacs",   label: "🔵 Emacs",    hint: "Ctrl+pnbf navigation" },
+      { value: "default", label: t("kb.default"),  hint: t("kb.defaultHint") },
+      { value: "vim",     label: t("kb.vim"),      hint: t("kb.vimHint") },
+      { value: "emacs",   label: t("kb.emacs"),    hint: t("kb.emacsHint") },
     ],
   });
-  if (p.isCancel(kb)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(kb)) { p.cancel(t("cancelled")); process.exit(0); }
   return kb;
 }

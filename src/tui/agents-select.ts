@@ -1,16 +1,17 @@
 import * as p from "@clack/prompts";
+import { t } from "../i18n.js";
 
 export async function selectAgents(): Promise<string> {
   const agent = await p.select({
-    message: "AGENTS.md template:",
+    message: t("agent.select"),
     options: [
-      { value: "general-developer",  label: "📋 General Developer",    hint: "Universal coding guidelines" },
-      { value: "fullstack-developer", label: "🏗️  Full-Stack Developer", hint: "Frontend + Backend + DB" },
-      { value: "security-researcher", label: "🔒 Security Researcher",  hint: "Pentesting & audit" },
-      { value: "data-ai-engineer",    label: "🤖 Data & AI Engineer",   hint: "MLOps & pipelines" },
-      { value: "colony-operator",     label: "🐜 Colony Operator",      hint: "Ant swarm multi-agent" },
+      { value: "general-developer",  label: t("agent.general"),   hint: t("agent.generalHint") },
+      { value: "fullstack-developer", label: t("agent.fullstack"), hint: t("agent.fullstackHint") },
+      { value: "security-researcher", label: t("agent.security"),  hint: t("agent.securityHint") },
+      { value: "data-ai-engineer",    label: t("agent.dataai"),    hint: t("agent.dataaiHint") },
+      { value: "colony-operator",     label: t("agent.colony"),    hint: t("agent.colonyHint") },
     ],
   });
-  if (p.isCancel(agent)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(agent)) { p.cancel(t("cancelled")); process.exit(0); }
   return agent;
 }

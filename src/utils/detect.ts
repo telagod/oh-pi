@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -12,6 +12,7 @@ export interface EnvInfo {
   os: string;
   existingFiles: string[];
   configSizeKB: number;
+  existingProviders: string[];
 }
 
 function scanDir(dir: string, prefix = ""): string[] {
@@ -38,6 +39,32 @@ function dirSizeKB(dir: string): number {
   return Math.round(bytes / 1024);
 }
 
+/** Detect existing provider names from auth.json + settings.json */
+function detectProviders(agentDir: string): string[] {
+  const providers: Set<string> = new Set();
+
+  // From auth.json keys
+  try {
+    const auth = JSON.parse(readFileSync(join(agentDir, "auth.json"), "utf8"));
+    for (const key of Object.keys(auth)) providers.add(key);
+  } catch { /* skip */ }
+
+  // From settings.json defaultProvider
+  try {
+    const settings = JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8"));
+    if (settings.defaultProvider) providers.add(settings.defaultProvider);
+  } catch { /* skip */ }
+
+  // From models.json custom providers
+  try {
+    const models = JSON.parse(readFileSync(join(agentDir, "models.json"), "utf8"));
+    const providerKeys = models.providers ? Object.keys(models.providers) : Object.keys(models);
+    for (const key of providerKeys) providers.add(key);
+  } catch { /* skip */ }
+
+  return [...providers];
+}
+
 export async function detectEnv(): Promise<EnvInfo> {
   const agentDir = join(homedir(), ".pi", "agent");
   let piVersion: string | null = null;
@@ -59,5 +86,6 @@ export async function detectEnv(): Promise<EnvInfo> {
     os: process.platform,
     existingFiles,
     configSizeKB: dirSizeKB(agentDir),
+    existingProviders: detectProviders(agentDir),
   };
 }

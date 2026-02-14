@@ -1,12 +1,12 @@
 import * as p from "@clack/prompts";
+import { t } from "../i18n.js";
 import type { OhPConfig } from "../types.js";
 
 interface Preset extends Omit<OhPConfig, "providers"> {}
 
-const PRESETS: Record<string, { label: string; hint: string; config: Preset }> = {
+const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Preset }> = {
   starter: {
-    label: "🟢 Starter",
-    hint: "New to AI coding? Start here",
+    labelKey: "preset.starter", hintKey: "preset.starterHint",
     config: {
       theme: "oh-p-dark", keybindings: "default", thinking: "medium",
       extensions: ["safe-guard", "git-guard", "auto-session-name"],
@@ -16,8 +16,7 @@ const PRESETS: Record<string, { label: string; hint: string; config: Preset }> =
     },
   },
   pro: {
-    label: "🔵 Pro Developer",
-    hint: "Full-stack dev with all the bells and whistles",
+    labelKey: "preset.pro", hintKey: "preset.proHint",
     config: {
       theme: "catppuccin-mocha", keybindings: "default", thinking: "high",
       extensions: ["safe-guard", "git-guard", "auto-session-name"],
@@ -27,8 +26,7 @@ const PRESETS: Record<string, { label: string; hint: string; config: Preset }> =
     },
   },
   security: {
-    label: "🟣 Security Researcher",
-    hint: "Pentesting, auditing, vulnerability research",
+    labelKey: "preset.security", hintKey: "preset.securityHint",
     config: {
       theme: "cyberpunk", keybindings: "default", thinking: "high",
       extensions: ["safe-guard"],
@@ -38,8 +36,7 @@ const PRESETS: Record<string, { label: string; hint: string; config: Preset }> =
     },
   },
   dataai: {
-    label: "🟠 Data & AI Engineer",
-    hint: "MLOps, data pipelines, AI applications",
+    labelKey: "preset.dataai", hintKey: "preset.dataaiHint",
     config: {
       theme: "tokyo-night", keybindings: "default", thinking: "medium",
       extensions: ["safe-guard", "git-guard", "auto-session-name"],
@@ -49,16 +46,14 @@ const PRESETS: Record<string, { label: string; hint: string; config: Preset }> =
     },
   },
   minimal: {
-    label: "🔴 Minimal",
-    hint: "Just the core, nothing extra",
+    labelKey: "preset.minimal", hintKey: "preset.minimalHint",
     config: {
       theme: "dark", keybindings: "default", thinking: "off",
       extensions: [], skills: [], prompts: [], agents: "general-developer",
     },
   },
   full: {
-    label: "⚫ Full Power",
-    hint: "Everything installed, ant colony included",
+    labelKey: "preset.full", hintKey: "preset.fullHint",
     config: {
       theme: "oh-p-dark", keybindings: "default", thinking: "high",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "ant-colony"],
@@ -71,13 +66,13 @@ const PRESETS: Record<string, { label: string; hint: string; config: Preset }> =
 
 export async function selectPreset(): Promise<Preset> {
   const key = await p.select({
-    message: "Choose a preset:",
+    message: t("preset.select"),
     options: Object.entries(PRESETS).map(([k, v]) => ({
       value: k,
-      label: v.label,
-      hint: v.hint,
+      label: t(v.labelKey),
+      hint: t(v.hintKey),
     })),
   });
-  if (p.isCancel(key)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(key)) { p.cancel(t("cancelled")); process.exit(0); }
   return PRESETS[key]!.config;
 }

@@ -1,24 +1,29 @@
 import * as p from "@clack/prompts";
 import chalk from "chalk";
+import { t } from "../i18n.js";
 import type { EnvInfo } from "../utils/detect.js";
 
 export function welcome(env: EnvInfo) {
   console.clear();
-  p.intro(chalk.cyan.bold(" oh-pi ") + chalk.dim("— one-click setup for pi agent"));
+  p.intro(chalk.cyan.bold(" oh-pi ") + chalk.dim(t("welcome.title")));
 
   if (env.piInstalled) {
-    p.log.success(`pi ${env.piVersion} detected`);
+    p.log.success(t("welcome.piDetected", { version: env.piVersion ?? "" }));
   } else {
-    p.log.warn("pi not found — will install");
+    p.log.warn(t("welcome.piNotFound"));
   }
 
-  p.log.info(`${env.terminal} │ ${env.os} │ Node ${process.version}`);
+  p.log.info(t("welcome.envInfo", { terminal: env.terminal, os: env.os, node: process.version }));
+
+  if (env.existingProviders.length > 0) {
+    p.log.info(t("welcome.existingProviders", { providers: env.existingProviders.join(", ") }));
+  }
 
   if (env.hasExistingConfig) {
     p.note(
-      `${env.existingFiles.length} files (${env.configSizeKB}KB) at ~/.pi/agent/\n` +
+      t("welcome.existingConfigDetail", { count: env.existingFiles.length, size: env.configSizeKB }) + "\n" +
       categorize(env.existingFiles),
-      "⚠ Existing config found",
+      t("welcome.existingConfig"),
     );
   }
 }

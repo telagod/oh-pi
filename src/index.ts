@@ -1,4 +1,6 @@
 import * as p from "@clack/prompts";
+import { selectLanguage } from "./i18n.js";
+import { t } from "./i18n.js";
 import { welcome } from "./tui/welcome.js";
 import { selectMode } from "./tui/mode-select.js";
 import { setupProviders } from "./tui/provider-setup.js";
@@ -13,6 +15,7 @@ import type { OhPConfig } from "./types.js";
 
 export async function run() {
   const env = await detectEnv();
+  await selectLanguage();
   welcome(env);
 
   const mode = await selectMode(env);
@@ -30,7 +33,7 @@ export async function run() {
 }
 
 async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
-  const providers = await setupProviders();
+  const providers = await setupProviders(env);
   const theme = "oh-p-dark";
   return {
     providers,
@@ -46,12 +49,12 @@ async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
 
 async function presetFlow(env: EnvInfo): Promise<OhPConfig> {
   const preset = await selectPreset();
-  const providers = await setupProviders();
+  const providers = await setupProviders(env);
   return { ...preset, providers };
 }
 
 async function customFlow(env: EnvInfo): Promise<OhPConfig> {
-  const providers = await setupProviders();
+  const providers = await setupProviders(env);
   const theme = await selectTheme();
   const keybindings = await selectKeybindings();
   const extensions = await selectExtensions();
@@ -59,24 +62,24 @@ async function customFlow(env: EnvInfo): Promise<OhPConfig> {
 
   // Advanced: auto-compaction threshold
   const wantAdvanced = await p.confirm({
-    message: "Configure advanced settings? (compaction threshold, etc.)",
+    message: t("advanced.configure"),
     initialValue: false,
   });
-  if (p.isCancel(wantAdvanced)) { p.cancel("Cancelled."); process.exit(0); }
+  if (p.isCancel(wantAdvanced)) { p.cancel(t("cancelled")); process.exit(0); }
 
   let compactThreshold = 0.75;
   if (wantAdvanced) {
     const threshold = await p.text({
-      message: "Auto-compact when context reaches % of window (0-100):",
+      message: t("advanced.compactThreshold"),
       placeholder: "75",
       initialValue: "75",
       validate: (v) => {
         const n = Number(v);
-        if (isNaN(n) || n < 10 || n > 100) return "Must be a number between 10 and 100";
+        if (isNaN(n) || n < 10 || n > 100) return t("advanced.compactValidation");
         return undefined;
       },
     });
-    if (p.isCancel(threshold)) { p.cancel("Cancelled."); process.exit(0); }
+    if (p.isCancel(threshold)) { p.cancel(t("cancelled")); process.exit(0); }
     compactThreshold = Number(threshold) / 100;
   }
 
