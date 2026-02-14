@@ -2,6 +2,7 @@ export interface ProviderConfig {
   name: string;
   apiKey: string;
   defaultModel?: string;
+  baseUrl?: string;
 }
 
 export interface OhPConfig {
