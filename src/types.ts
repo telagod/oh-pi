@@ -76,6 +76,7 @@ export const EXTENSIONS = [
   { name: "safe-guard",        label: "🛡️  Safe Guard — Dangerous command confirm + path protection", default: true },
   { name: "git-guard",         label: "📦 Git Guard — Auto stash checkpoint + dirty repo warning + notify", default: true },
   { name: "auto-session-name", label: "📝 Auto Session Name — Name sessions from first message", default: true },
+  { name: "custom-footer",     label: "📊 Custom Footer — Enhanced status bar with tokens, cost, time, git, cwd", default: false },
   { name: "ant-colony",        label: "🐜 Ant Colony — Autonomous multi-agent swarm with adaptive concurrency", default: false },
 ];
 
