@@ -1,0 +1,48 @@
+{
+  "name": "oh-pi",
+  "version": "0.1.0",
+  "description": "One-click setup for pi-coding-agent. Like oh-my-zsh for pi.",
+  "type": "module",
+  "bin": {
+    "oh-pi": "./dist/bin/oh-p.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/bin/oh-pi.js"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "configuration",
+    "setup",
+    "tui"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./pi-package/extensions"
+    ],
+    "skills": [
+      "./pi-package/skills"
+    ],
+    "prompts": [
+      "./pi-package/prompts"
+    ],
+    "themes": [
+      "./pi-package/themes"
+    ]
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.0.1",
+    "chalk": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
