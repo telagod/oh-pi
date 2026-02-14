@@ -7,10 +7,16 @@
     "oh-pi": "./dist/bin/oh-p.js"
   },
   "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "pi-package",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/bin/oh-pi.js"
+    "start": "node dist/bin/oh-p.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "pi-package",
