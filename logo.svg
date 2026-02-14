@@ -9,55 +9,76 @@
       <stop offset="100%" stop-color="#f43f5e"/>
     </linearGradient>
     <filter id="glow">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feGaussianBlur stdDeviation="5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
-  <!-- Background circle -->
-  <circle cx="256" cy="256" r="240" fill="#0f0f1a" stroke="url(#g1)" stroke-width="3" opacity="0.95"/>
+  <!-- Background -->
+  <circle cx="256" cy="256" r="240" fill="#0f0f1a" stroke="url(#g1)" stroke-width="2.5" opacity="0.95"/>
 
-  <!-- Ant body — minimal geometric -->
-  <!-- Head -->
-  <ellipse cx="256" cy="175" rx="38" ry="35" fill="url(#g1)" filter="url(#glow)"/>
-  <!-- Thorax -->
-  <ellipse cx="256" cy="255" rx="32" ry="30" fill="url(#g1)" filter="url(#glow)"/>
-  <!-- Abdomen -->
-  <ellipse cx="256" cy="345" rx="44" ry="42" fill="url(#g2)" filter="url(#glow)"/>
+  <!-- Head — diamond -->
+  <polygon points="256,130 290,168 256,206 222,168" fill="url(#g1)" filter="url(#glow)"/>
+
+  <!-- Thorax — diamond (smaller, 3 pairs attach here) -->
+  <polygon points="256,218 284,250 256,282 228,250" fill="url(#g1)" filter="url(#glow)"/>
+
+  <!-- Petiole — narrow connector -->
+  <polygon points="256,284 264,296 256,308 248,296" fill="url(#g1)" opacity="0.8"/>
+
+  <!-- Abdomen — large diamond -->
+  <polygon points="256,310 300,360 256,410 212,360" fill="url(#g2)" filter="url(#glow)"/>
 
   <!-- Eyes -->
-  <circle cx="242" cy="168" r="6" fill="#0f0f1a"/>
-  <circle cx="270" cy="168" r="6" fill="#0f0f1a"/>
-  <circle cx="243" cy="166" r="2.5" fill="#fff"/>
-  <circle cx="271" cy="166" r="2.5" fill="#fff"/>
+  <circle cx="246" cy="163" r="5" fill="#0f0f1a"/>
+  <circle cx="266" cy="163" r="5" fill="#0f0f1a"/>
+  <circle cx="247" cy="161.5" r="2" fill="#fff"/>
+  <circle cx="267" cy="161.5" r="2" fill="#fff"/>
 
   <!-- Antennae -->
-  <path d="M244 145 Q230 105 210 85" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-  <path d="M268 145 Q282 105 302 85" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-  <circle cx="208" cy="83" r="5" fill="#00d4aa"/>
-  <circle cx="304" cy="83" r="5" fill="#00d4aa"/>
+  <path d="M242 138 Q225 105 205 82" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <path d="M270 138 Q287 105 307 82" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="203" cy="80" r="4.5" fill="#00d4aa"/>
+  <circle cx="309" cy="80" r="4.5" fill="#00d4aa"/>
 
-  <!-- Legs — 3 pairs, clean lines -->
-  <!-- Front -->
-  <path d="M228 245 Q195 225 165 215" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="M284 245 Q317 225 347 215" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <!-- Middle -->
-  <path d="M225 260 Q185 265 155 275" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="M287 260 Q327 265 357 275" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <!-- Back -->
-  <path d="M230 340 Q195 365 170 385" stroke="url(#g2)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="M282 340 Q317 365 342 385" stroke="url(#g2)" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Mandibles -->
+  <path d="M240 200 Q232 215 225 210" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M272 200 Q280 215 287 210" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
 
-  <!-- Pheromone dots — orbiting particles -->
-  <circle cx="130" cy="180" r="3" fill="#00d4aa" opacity="0.6"/>
-  <circle cx="115" cy="310" r="2.5" fill="#7c3aed" opacity="0.5"/>
-  <circle cx="385" cy="195" r="2.5" fill="#00d4aa" opacity="0.5"/>
-  <circle cx="395" cy="330" r="3" fill="#f43f5e" opacity="0.4"/>
-  <circle cx="150" cy="420" r="2" fill="#7c3aed" opacity="0.4"/>
-  <circle cx="365" cy="415" r="2" fill="#00d4aa" opacity="0.5"/>
-  <circle cx="180" cy="130" r="2" fill="#f43f5e" opacity="0.3"/>
-  <circle cx="340" cy="120" r="2" fill="#7c3aed" opacity="0.3"/>
+  <!-- === LEGS: 1 pair front (head), 1 pair middle (thorax), 2 pairs back (abdomen) === -->
+
+  <!-- Front pair — from head-thorax joint -->
+  <path d="M228 210 Q195 195 162 188" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M162 188 Q155 195 148 205" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M284 210 Q317 195 350 188" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M350 188 Q357 195 364 205" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Middle pair — from thorax center -->
+  <path d="M228 250 Q190 252 158 260" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M158 260 Q150 270 145 282" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M284 250 Q322 252 354 260" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M354 260 Q362 270 367 282" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Back pair 1 — from abdomen upper -->
+  <path d="M220 340 Q185 335 158 342" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M158 342 Q148 352 140 368" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M292 340 Q327 335 354 342" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M354 342 Q364 352 372 368" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Back pair 2 — from abdomen lower -->
+  <path d="M224 372 Q192 385 168 400" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M168 400 Q162 410 158 425" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M288 372 Q320 385 344 400" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M344 400 Q350 410 354 425" stroke="url(#g2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Pheromone particles -->
+  <circle cx="120" cy="175" r="2.5" fill="#00d4aa" opacity="0.5"/>
+  <circle cx="108" cy="305" r="2" fill="#7c3aed" opacity="0.4"/>
+  <circle cx="392" cy="190" r="2" fill="#00d4aa" opacity="0.4"/>
+  <circle cx="400" cy="340" r="2.5" fill="#f43f5e" opacity="0.35"/>
+  <circle cx="135" cy="430" r="2" fill="#7c3aed" opacity="0.35"/>
+  <circle cx="378" cy="432" r="2" fill="#00d4aa" opacity="0.4"/>
 
   <!-- Text -->
-  <text x="256" y="455" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="42" fill="url(#g1)" letter-spacing="3">oh-pi</text>
+  <text x="256" y="478" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="38" fill="url(#g1)" letter-spacing="4">oh-pi</text>
 </svg>
