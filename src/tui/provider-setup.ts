@@ -21,17 +21,18 @@ async function fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {
 export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
   const entries = Object.entries(PROVIDERS);
 
-  // Detect existing providers and offer import
+  // Detect existing providers — offer skip or add new
   const detected = env?.existingProviders ?? [];
-  const knownDetected = detected.filter(p => p in PROVIDERS);
-  let initialValues = ["anthropic"];
-  if (knownDetected.length > 0) {
-    const useExisting = await p.confirm({
-      message: t("provider.detected", { list: knownDetected.join(", ") }),
-      initialValue: true,
+  if (detected.length > 0) {
+    const action = await p.select({
+      message: t("provider.detected", { list: detected.join(", ") }),
+      options: [
+        { value: "skip",  label: t("provider.detectedSkip"),  hint: t("provider.detectedSkipHint") },
+        { value: "add",   label: t("provider.detectedAdd"),   hint: t("provider.detectedAddHint") },
+      ],
     });
-    if (p.isCancel(useExisting)) { p.cancel(t("cancelled")); process.exit(0); }
-    if (useExisting) initialValues = knownDetected;
+    if (p.isCancel(action)) { p.cancel(t("cancelled")); process.exit(0); }
+    if (action === "skip") return [];
   }
 
   const selected = await p.multiselect({
@@ -40,7 +41,7 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
       ...entries.map(([key, info]) => ({ value: key, label: info.label, hint: info.env })),
       { value: "_custom", label: t("provider.custom"), hint: t("provider.customHint") },
     ],
-    initialValues,
+    initialValues: ["anthropic"],
     required: true,
   });
   if (p.isCancel(selected)) { p.cancel(t("cancelled")); process.exit(0); }

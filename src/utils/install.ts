@@ -30,13 +30,15 @@ export function applyConfig(config: OhPConfig) {
   const agentDir = join(homedir(), ".pi", "agent");
   ensureDir(agentDir);
 
-  // 1. auth.json
-  const auth: Record<string, { type: string; key: string }> = {};
-  for (const p of config.providers) {
-    auth[p.name] = { type: "api_key", key: p.apiKey };
+  // 1. auth.json (skip if no providers configured)
+  if (config.providers.length > 0) {
+    const auth: Record<string, { type: string; key: string }> = {};
+    for (const p of config.providers) {
+      auth[p.name] = { type: "api_key", key: p.apiKey };
+    }
+    const authPath = join(agentDir, "auth.json");
+    writeFileSync(authPath, JSON.stringify(auth, null, 2), { mode: 0o600 });
   }
-  const authPath = join(agentDir, "auth.json");
-  writeFileSync(authPath, JSON.stringify(auth, null, 2), { mode: 0o600 });
 
   // 2. settings.json
   const primary = config.providers[0];
@@ -47,8 +49,7 @@ export function applyConfig(config: OhPConfig) {
   const contextWindow = primary?.contextWindow ?? primaryCaps?.contextWindow ?? 128000;
   const reserveTokens = Math.round(contextWindow * (1 - compactThreshold));
   const settings: Record<string, unknown> = {
-    defaultProvider: primary?.name,
-    defaultModel: primaryModel,
+    ...(primary ? { defaultProvider: primary.name, defaultModel: primaryModel } : {}),
     defaultThinkingLevel: config.thinking,
     theme: config.theme,
     enableSkillCommands: true,

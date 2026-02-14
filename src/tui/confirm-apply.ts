@@ -12,8 +12,8 @@ function countExisting(env: EnvInfo, dir: string): number {
 export async function confirmApply(config: OhPConfig, env: EnvInfo) {
   // ═══ Summary ═══
   const summary = [
-    `${t("confirm.providers")}  ${chalk.cyan(config.providers.map(p => p.name).join(", "))}`,
-    `${t("confirm.model")}      ${chalk.cyan(config.providers[0]?.defaultModel || t("default"))}`,
+    `${t("confirm.providers")}  ${chalk.cyan(config.providers.length > 0 ? config.providers.map(p => p.name).join(", ") : t("confirm.skipped"))}`,
+    `${t("confirm.model")}      ${chalk.cyan(config.providers[0]?.defaultModel || t("confirm.skipped"))}`,
     `${t("confirm.theme")}      ${chalk.cyan(config.theme)}`,
     `${t("confirm.keybindings")}${chalk.cyan(config.keybindings)}`,
     `${t("confirm.thinking")}   ${chalk.cyan(config.thinking)}`,
