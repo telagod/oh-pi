@@ -15,6 +15,12 @@ export interface EnvInfo {
   existingProviders: string[];
 }
 
+/**
+ * 递归扫描目录，返回所有文件的相对路径列表
+ * @param dir - 要扫描的目录路径
+ * @param prefix - 路径前缀，用于递归拼接相对路径
+ * @returns 文件相对路径数组
+ */
 function scanDir(dir: string, prefix = ""): string[] {
   if (!existsSync(dir)) return [];
   const files: string[] = [];
@@ -28,6 +34,11 @@ function scanDir(dir: string, prefix = ""): string[] {
   return files;
 }
 
+/**
+ * 计算目录的总大小（KB）
+ * @param dir - 目录路径
+ * @returns 目录大小，单位为 KB（四舍五入）
+ */
 function dirSizeKB(dir: string): number {
   if (!existsSync(dir)) return 0;
   let bytes = 0;
@@ -39,7 +50,11 @@ function dirSizeKB(dir: string): number {
   return Math.round(bytes / 1024);
 }
 
-/** Detect existing provider names from auth.json + settings.json */
+/**
+ * 从 auth.json、settings.json、models.json 中检测已配置的 provider 名称
+ * @param agentDir - agent 配置目录路径
+ * @returns 已配置的 provider 名称数组
+ */
 function detectProviders(agentDir: string): string[] {
   const providers: Set<string> = new Set();
 
@@ -65,6 +80,10 @@ function detectProviders(agentDir: string): string[] {
   return [...providers];
 }
 
+/**
+ * 检测当前环境信息，包括 pi 安装状态、版本、配置目录及已配置的 provider
+ * @returns 环境信息对象 {@link EnvInfo}
+ */
 export async function detectEnv(): Promise<EnvInfo> {
   const agentDir = join(homedir(), ".pi", "agent");
   let piVersion: string | null = null;

@@ -13,6 +13,9 @@ import { confirmApply } from "./tui/confirm-apply.js";
 import { detectEnv, type EnvInfo } from "./utils/detect.js";
 import type { OhPConfig } from "./types.js";
 
+/**
+ * 主入口函数。检测环境、选择语言、展示欢迎界面，根据用户选择的模式执行对应配置流程，最终确认并应用配置。
+ */
 export async function run() {
   const env = await detectEnv();
   await selectLanguage();
@@ -33,6 +36,11 @@ export async function run() {
   await confirmApply(config, env);
 }
 
+/**
+ * 快速配置流程。仅需设置提供商和主题，其余选项使用推荐默认值。
+ * @param env - 当前检测到的环境信息
+ * @returns 生成的配置对象
+ */
 async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
   const providers = await setupProviders(env);
   const theme = await selectTheme();
@@ -48,12 +56,22 @@ async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
   };
 }
 
+/**
+ * 预设配置流程。用户选择一个预设方案，再配置提供商，合并生成最终配置。
+ * @param env - 当前检测到的环境信息
+ * @returns 生成的配置对象
+ */
 async function presetFlow(env: EnvInfo): Promise<OhPConfig> {
   const preset = await selectPreset();
   const providers = await setupProviders(env);
   return { ...preset, providers };
 }
 
+/**
+ * 自定义配置流程。用户逐项选择主题、快捷键、扩展、代理等，并可配置高级选项（如自动压缩阈值）。
+ * @param env - 当前检测到的环境信息
+ * @returns 生成的配置对象
+ */
 async function customFlow(env: EnvInfo): Promise<OhPConfig> {
   const providers = await setupProviders(env);
   const theme = await selectTheme();

@@ -1,36 +1,60 @@
+/** 模型提供商配置 */
 export interface ProviderConfig {
+  /** 提供商名称 */
   name: string;
+  /** API 密钥 */
   apiKey: string;
+  /** 默认模型 */
   defaultModel?: string;
+  /** 自定义 API 地址 */
   baseUrl?: string;
-  // Model capabilities (used for custom providers)
+  /** 上下文窗口大小（自定义提供商用） */
   contextWindow?: number;
+  /** 最大输出 token 数（自定义提供商用） */
   maxTokens?: number;
+  /** 是否支持推理 */
   reasoning?: boolean;
+  /** 是否支持多模态 */
   multimodal?: boolean;
 }
 
+/** oh-pi 全局配置 */
 export interface OhPConfig {
+  /** 已配置的提供商列表 */
   providers: ProviderConfig[];
+  /** 主题名称 */
   theme: string;
+  /** 快捷键方案 */
   keybindings: string;
+  /** 启用的扩展列表 */
   extensions: string[];
+  /** 启用的技能列表 */
   skills: string[];
+  /** 提示词模板列表 */
   prompts: string[];
+  /** Agent 配置路径 */
   agents: string;
+  /** 思维模式 */
   thinking: string;
+  /** 语言区域 */
   locale?: string;
-  compactThreshold?: number; // 0-1, fraction of context window to trigger compaction (default 0.75)
+  /** 上下文压缩阈值，0-1，占上下文窗口的比例（默认 0.75） */
+  compactThreshold?: number;
 }
 
-/** Official model capabilities for known providers */
+/** 已知模型的官方能力参数 */
 export interface ModelCapabilities {
+  /** 上下文窗口大小 */
   contextWindow: number;
+  /** 最大输出 token 数 */
   maxTokens: number;
+  /** 是否支持推理 */
   reasoning: boolean;
+  /** 支持的输入类型 */
   input: ("text" | "image")[];
 }
 
+/** 各模型能力参数映射表 */
 export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
   // Anthropic
   "claude-sonnet-4-20250514":  { contextWindow: 200000, maxTokens: 16384, reasoning: true,  input: ["text", "image"] },
@@ -52,6 +76,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
   "mistral-large-latest":      { contextWindow: 128000, maxTokens: 8192,  reasoning: false, input: ["text"] },
 };
 
+/** 支持的提供商注册表（名称、环境变量、可用模型） */
 export const PROVIDERS: Record<string, { env: string; label: string; models: string[] }> = {
   anthropic:  { env: "ANTHROPIC_API_KEY",  label: "Anthropic (Claude)",     models: ["claude-sonnet-4-20250514", "claude-opus-4-0520"] },
   openai:     { env: "OPENAI_API_KEY",     label: "OpenAI (GPT)",           models: ["gpt-4o", "o3-mini"] },
@@ -62,6 +87,7 @@ export const PROVIDERS: Record<string, { env: string; label: string; models: str
   mistral:    { env: "MISTRAL_API_KEY",    label: "Mistral",               models: ["mistral-large-latest"] },
 };
 
+/** 可用主题列表 */
 export const THEMES = [
   { name: "dark",             label: "Pi Default Dark",            style: "dark" },
   { name: "oh-p-dark",        label: "oh-pi Dark (Cyan+Purple)",   style: "dark" },
@@ -73,6 +99,7 @@ export const THEMES = [
   { name: "light",            label: "Pi Default Light",           style: "light" },
 ];
 
+/** 可用扩展列表 */
 export const EXTENSIONS = [
   { name: "safe-guard",        label: "🛡️  Safe Guard — Dangerous command confirm + path protection", default: true },
   { name: "git-guard",         label: "📦 Git Guard — Auto stash checkpoint + dirty repo warning + notify", default: true },
@@ -82,6 +109,7 @@ export const EXTENSIONS = [
   { name: "ant-colony",        label: "🐜 Ant Colony — Autonomous multi-agent swarm with adaptive concurrency", default: false },
 ];
 
+/** 快捷键绑定方案（default / vim / emacs） */
 export const KEYBINDING_SCHEMES: Record<string, object> = {
   default: {},
   vim: {

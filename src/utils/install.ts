@@ -8,17 +8,28 @@ import { KEYBINDING_SCHEMES, MODEL_CAPABILITIES, PROVIDERS } from "../types.js";
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+/**
+ * 确保目录存在，若不存在则递归创建
+ * @param dir - 目标目录路径
+ */
 function ensureDir(dir: string) {
   mkdirSync(dir, { recursive: true });
 }
 
-/** Remove and recreate a directory */
+/**
+ * 清空并重建目录，若目录已存在则先删除再重新创建
+ * @param dir - 目标目录路径
+ */
 function cleanDir(dir: string) {
   if (existsSync(dir)) rmSync(dir, { recursive: true });
   ensureDir(dir);
 }
 
-/** Recursively copy a directory */
+/**
+ * 递归复制目录及其所有内容到目标路径
+ * @param src - 源目录路径
+ * @param dest - 目标目录路径
+ */
 function copyDir(src: string, dest: string) {
   ensureDir(dest);
   for (const entry of readdirSync(src, { withFileTypes: true })) {
@@ -32,6 +43,10 @@ function copyDir(src: string, dest: string) {
   }
 }
 
+/**
+ * 应用 OhP 配置，生成并写入 ~/.pi/agent/ 下的所有配置文件
+ * @param config - OhP 配置对象
+ */
 export function applyConfig(config: OhPConfig) {
   const agentDir = join(homedir(), ".pi", "agent");
   ensureDir(agentDir);
@@ -163,6 +178,9 @@ export function applyConfig(config: OhPConfig) {
   try { copyFileSync(themeSrc, join(themeDir, `${config.theme}.json`)); } catch { /* built-in theme */ }
 }
 
+/**
+ * 全局安装 pi-coding-agent，安装失败时抛出异常
+ */
 export function installPi() {
   try {
     execSync("npm install -g @mariozechner/pi-coding-agent", { stdio: "inherit" });
@@ -171,7 +189,10 @@ export function installPi() {
   }
 }
 
-/** 备份 ~/.pi/agent/ 到 ~/.pi/agent.bak-{timestamp}/ */
+/**
+ * 备份 ~/.pi/agent/ 目录到 ~/.pi/agent.bak-{timestamp}/
+ * @returns 备份目录路径，若原目录不存在则返回空字符串
+ */
 export function backupConfig(): string {
   const agentDir = join(homedir(), ".pi", "agent");
   if (!existsSync(agentDir)) return "";

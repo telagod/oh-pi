@@ -438,7 +438,12 @@ const messages: Record<Locale, Record<string, string>> = {
   },
 };
 
-/** Get translated string with interpolation */
+/**
+ * 根据当前语言环境获取翻译文本，支持变量插值。
+ * @param key - 翻译键名
+ * @param vars - 可选的插值变量，用于替换文本中的 `{key}` 占位符
+ * @returns 翻译后的字符串，若未找到则返回原始 key
+ */
 export function t(key: string, vars?: Record<string, string | number>): string {
   let text = messages[current]?.[key] ?? messages.en[key] ?? key;
   if (vars) {
@@ -449,10 +454,23 @@ export function t(key: string, vars?: Record<string, string | number>): string {
   return text;
 }
 
+/**
+ * 设置当前语言环境。
+ * @param locale - 目标语言代码
+ */
 export function setLocale(locale: Locale) { current = locale; }
+
+/**
+ * 获取当前语言环境。
+ * @returns 当前的语言代码
+ */
 export function getLocale(): Locale { return current; }
 
-/** Detect locale from env, returns undefined if ambiguous */
+/**
+ * 从环境变量中检测用户语言环境。
+ * 依次检查 LANG、LC_ALL、LANGUAGE，无法确定时返回 undefined。
+ * @returns 检测到的语言代码，或 undefined
+ */
 function detectLocale(): Locale | undefined {
   const lang = (process.env.LANG ?? process.env.LC_ALL ?? process.env.LANGUAGE ?? "").toLowerCase();
   if (lang.startsWith("zh")) return "zh";
@@ -461,7 +479,10 @@ function detectLocale(): Locale | undefined {
   return undefined;
 }
 
-/** Prompt user to select language */
+/**
+ * 提示用户选择语言。若能从环境变量自动检测则直接使用，否则弹出交互选择。
+ * @returns 用户选择或自动检测的语言代码
+ */
 export async function selectLanguage(): Promise<Locale> {
   const detected = detectLocale();
   if (detected) { setLocale(detected); return detected; }
