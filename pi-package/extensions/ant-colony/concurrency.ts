@@ -14,10 +14,10 @@ const CPU_CORES = os.cpus().length;
 
 export function defaultConcurrency(): ConcurrencyConfig {
   return {
-    current: 1,
+    current: 2,
     min: 1,
     max: Math.min(CPU_CORES, 8),
-    optimal: 2,
+    optimal: 3,
     history: [],
   };
 }
@@ -68,8 +68,8 @@ export function adapt(config: ConcurrencyConfig, pendingTasks: number): Concurre
   const taskCap = Math.min(pendingTasks, config.max);
 
   if (samples.length < 3) {
-    // 冷启动：保守起步
-    next.current = Math.min(2, taskCap);
+    // 冷启动：直接给一半 max，快速利用并发
+    next.current = Math.min(Math.ceil(config.max / 2), taskCap);
     return next;
   }
 

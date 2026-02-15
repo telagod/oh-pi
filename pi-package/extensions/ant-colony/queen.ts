@@ -236,9 +236,9 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
       }
     }
 
-    // 自适应并发（每 5000ms 采样一次）
+    // 自适应并发（每 2000ms 采样一次）
     const now = Date.now();
-    if (now - lastSampleTime >= 5000) {
+    if (now - lastSampleTime >= 2000) {
       lastSampleTime = now;
       const completedRecently = state.tasks.filter(t =>
         t.status === "done" && t.finishedAt && t.finishedAt > now - 120000
@@ -260,7 +260,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
 
     if (slotsAvailable === 0) {
       // 等待一下再检查
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 500));
       continue;
     }
 
@@ -336,51 +336,39 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   };
 
   try {
-    // ═══ Phase 1: 侦察（接力机制） ═══
-    let scoutAttempt = 0;
-    const MAX_SCOUT_RETRIES = 2;
-    let workerTasks: Task[] = [];
+    // ═══ Phase 1: 侦察（快速单次，不再多轮接力） ═══
+    callbacks.onPhase("scouting", "Dispatching scout ant to explore codebase...");
+    await runAntWave({ ...waveBase, caste: "scout" });
 
-    while (scoutAttempt <= MAX_SCOUT_RETRIES) {
-      callbacks.onPhase("scouting", scoutAttempt === 0
-        ? "Dispatching scout ants to explore codebase..."
-        : `Scout relay ${scoutAttempt}/${MAX_SCOUT_RETRIES} (building on previous discoveries)...`);
+    let workerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
 
+    // 只在完全没有 worker 任务时才重试一次
+    if (workerTasks.length === 0) {
+      const pheromones = nest.getAllPheromones();
+      const hasDiscoveries = pheromones.some(p => p.type === "discovery");
+      const relayTask: Task = {
+        id: makeTaskId(),
+        parentId: null,
+        title: "Scout relay: generate worker tasks",
+        description: hasDiscoveries
+          ? `Previous scout found information but didn't generate worker tasks. Generate concrete worker tasks based on discoveries.\n\nGoal:\n${opts.goal}`
+          : `Explore the codebase for this goal and generate worker tasks:\n\n${opts.goal}`,
+        caste: "scout",
+        status: "pending",
+        priority: 1,
+        files: [],
+        claimedBy: null,
+        result: null,
+        error: null,
+        spawnedTasks: [],
+        createdAt: Date.now(),
+        startedAt: null,
+        finishedAt: null,
+      };
+      nest.writeTask(relayTask);
+      callbacks.onPhase("scouting", "Scout relay: generating worker tasks...");
       await runAntWave({ ...waveBase, caste: "scout" });
-
       workerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
-      if (workerTasks.length > 0) break;
-
-      scoutAttempt++;
-      if (scoutAttempt <= MAX_SCOUT_RETRIES) {
-        // 接力：检查是否有信息素（前一只 scout 的部分发现）
-        const pheromones = nest.getAllPheromones();
-        const hasDiscoveries = pheromones.some(p => p.type === "discovery");
-
-        // 创建接力 scout 任务（而非重置旧任务）
-        const relayDescription = hasDiscoveries
-          ? `Continue exploring the codebase. Previous scouts made partial discoveries (see pheromone trail). Focus on areas NOT yet explored and generate worker tasks.\n\nOriginal goal:\n${opts.goal}`
-          : `Explore the codebase and identify all files, modules, and dependencies relevant to this goal:\n\n${opts.goal}\n\nBe thorough. The colony depends on your intelligence.`;
-
-        const relayTask: Task = {
-          id: makeTaskId(),
-          parentId: null,
-          title: hasDiscoveries ? "Scout relay: continue exploration" : "Scout: explore codebase for goal",
-          description: relayDescription,
-          caste: "scout",
-          status: "pending",
-          priority: 1,
-          files: [],
-          claimedBy: null,
-          result: null,
-          error: null,
-          spawnedTasks: [],
-          createdAt: Date.now(),
-          startedAt: null,
-          finishedAt: null,
-        };
-        nest.writeTask(relayTask);
-      }
     }
 
     if (workerTasks.length === 0) {

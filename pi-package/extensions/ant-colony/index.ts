@@ -12,7 +12,7 @@
 import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text, Container, Spacer } from "@mariozechner/pi-tui";
+import { Text, Container, Spacer, matchesKey } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
@@ -46,30 +46,6 @@ function casteIcon(caste: string): string {
   return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : "⚒️";
 }
 
-function progressBar(done: number, total: number, width: number, theme: any): string {
-  if (total === 0) return "";
-  const pct = Math.min(done / total, 1);
-  const filled = Math.round(pct * width);
-  const empty = width - filled;
-  return theme.fg("success", "█".repeat(filled)) + theme.fg("muted", "░".repeat(empty)) + " " + theme.fg("accent", `${done}/${total}`);
-}
-
-function phasePipeline(status: string, theme: any): string {
-  const phases = [
-    { key: "scouting", icon: "🔍", label: "Scout" },
-    { key: "working", icon: "⚒️", label: "Work" },
-    { key: "reviewing", icon: "🛡️", label: "Review" },
-    { key: "done", icon: "✅", label: "Done" },
-  ];
-  const idx = phases.findIndex(p => p.key === status);
-  return phases.map((p, i) => {
-    const label = `${p.icon} ${p.label}`;
-    if (i < idx) return theme.fg("success", label);
-    if (i === idx) return theme.fg("accent", theme.bold(label));
-    return theme.fg("muted", label);
-  }).join(theme.fg("muted", " → "));
-}
-
 // ═══ Background colony state ═══
 
 interface AntStreamState {
@@ -94,64 +70,41 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   // 当前运行中的后台蚁群（同时只允许一个）
   let activeColony: BackgroundColony | null = null;
 
-  // ─── Widget/Status 渲染 ───
+  // ─── Status 渲染 ───
 
   let lastRender = 0;
   const throttledRender = () => {
     const now = Date.now();
-    if (now - lastRender < 200) return;
+    if (now - lastRender < 500) return;
     lastRender = now;
-    renderWidget();
-    renderStatus();
+    pi.events.emit("ant-colony:render");
   };
 
-  const renderWidget = () => {
-    if (!activeColony) return;
-    const { state, phase, antStreams } = activeColony;
-    const streams = Array.from(antStreams.values());
-    const lines: string[] = [];
-
-    const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
-    const cost = state ? formatCost(state.metrics.totalCost) : "$0";
-    lines.push(`🐜 Colony: ${phase} │ ${elapsed} │ ${cost}`);
-
-    if (state && state.metrics.tasksTotal > 0) {
-      const m = state.metrics;
-      const pct = Math.round((m.tasksDone / m.tasksTotal) * 100);
-      const filled = Math.round(pct / 5);
-      lines.push(`  ${"█".repeat(filled)}${"░".repeat(20 - filled)} ${m.tasksDone}/${m.tasksTotal} (${pct}%)`);
-    }
-
-    for (const s of streams.slice(-4)) {
-      const icon = casteIcon(s.caste);
-      const line = s.lastLine.length > 60 ? s.lastLine.slice(0, 57) + "..." : s.lastLine;
-      lines.push(`  ${icon} ${s.antId.slice(0, 15)} ▸ ${line || "..."}`);
-    }
-
-    pi.events.emit("ant-colony:widget", lines);
-  };
-
-  const renderStatus = () => {
-    if (!activeColony) return;
-    const { state, antStreams } = activeColony;
-    if (!state) return;
-    const m = state.metrics;
-    const active = antStreams.size;
-    pi.events.emit("ant-colony:status",
-      `🐜 ${statusIcon(state.status)} ${m.tasksDone}/${m.tasksTotal} tasks │ ${active} active │ ${formatCost(m.totalCost)}`
-    );
-  };
-
-  // 监听自己的事件来更新 UI（确保在有 ctx 的上下文中）
+  // 监听事件来更新 UI（确保在有 ctx 的上下文中）
   pi.on("session_start", async (_event, ctx) => {
-    pi.events.on("ant-colony:widget", (lines: string[]) => {
-      ctx.ui.setWidget("ant-colony", lines);
+    pi.events.on("ant-colony:render", () => {
+      if (!activeColony) return;
+      const { state, antStreams } = activeColony;
+      const active = antStreams.size;
+      const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
+      const m = state?.metrics;
+      const colonyStatus = state?.status || "scouting";
+      const ants = state?.ants || [];
+      const turns = ants.reduce((s, a) => s + a.usage.turns, 0);
+      const outTok = ants.reduce((s, a) => s + a.usage.output, 0);
+
+      const parts = [`🐜 ${statusIcon(colonyStatus)}`];
+      if (m) parts.push(`${m.tasksDone}/${m.tasksTotal}`);
+      parts.push(`${active}⚡`);
+      parts.push(`${turns}↻`);
+      parts.push(formatTokens(outTok) + "↑");
+      if (m) parts.push(formatCost(m.totalCost));
+      parts.push(elapsed);
+
+      ctx.ui.setStatus("ant-colony", parts.join(" │ "));
     });
-    pi.events.on("ant-colony:status", (status: string) => {
-      ctx.ui.setStatus("ant-colony", status);
-    });
+
     pi.events.on("ant-colony:clear-ui", () => {
-      ctx.ui.setWidget("ant-colony", undefined);
       ctx.ui.setStatus("ant-colony", undefined);
     });
     pi.events.on("ant-colony:notify", (data: { msg: string; level: "info" | "success" | "warning" | "error" }) => {
@@ -361,7 +314,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       // 注入结果到对话
       pi.sendMessage({
         customType: "ant-colony-report",
-        content: report,
+        content: `[COLONY_SIGNAL:COMPLETE]\n${report}`,
         display: true,
       }, { triggerTurn: true, deliverAs: "followUp" });
 
@@ -373,6 +326,11 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       pi.events.emit("ant-colony:clear-ui");
       activeColony = null;
       pi.events.emit("ant-colony:notify", { msg: `🐜 Colony crashed: ${e}`, level: "error" });
+      pi.sendMessage({
+        customType: "ant-colony-report",
+        content: `[COLONY_SIGNAL:FAILED]\n## 🐜 Colony Crashed\n${e}`,
+        display: true,
+      }, { triggerTurn: true, deliverAs: "followUp" });
     });
   }
 
@@ -390,7 +348,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     } catch { /* ignore */ }
 
     const colonyStatus = activeColony
-      ? `\n[COLONY RUNNING] A colony is already running in the background. Do NOT launch another. Use /colony-stop to cancel it first.`
+      ? `\n[COLONY_SIGNAL:RUNNING] A colony is currently running in the background for goal: "${activeColony.goal.slice(0, 100)}". Do NOT launch another colony. Do NOT check progress or assume failure. You will receive [COLONY_SIGNAL:COMPLETE] automatically when it finishes. If the user asks about colony status, tell them it's still running. Use /colony-stop to cancel.`
       : "";
 
     return {
@@ -405,8 +363,17 @@ You have the ant_colony tool. Use it automatically when:
 Do NOT ask for confirmation. Call ant_colony directly with a clear goal.
 For simple single-file tasks, work directly without the colony.
 
-The colony runs in the BACKGROUND — you can continue chatting while it works.
-Results are injected into the conversation when the colony finishes.
+[COLONY SIGNAL PROTOCOL]
+The colony communicates via signals. You MUST obey these:
+- [COLONY_SIGNAL:LAUNCHED] — Colony started. Do NOT poll, check, or assume failure. Wait for completion signal.
+- [COLONY_SIGNAL:RUNNING] — Colony is active. Do NOT launch another or check progress.
+- [COLONY_SIGNAL:COMPLETE] — Colony finished. Review the report and summarize results to the user.
+- [COLONY_SIGNAL:FAILED] — Colony crashed. Report the error to the user.
+
+After launching a colony, your ONLY correct behavior is:
+1. Tell the user the colony is running
+2. Continue chatting about OTHER topics if the user asks
+3. Wait for [COLONY_SIGNAL:COMPLETE] or [COLONY_SIGNAL:FAILED] — do NOT guess the outcome
 ${modelList ? `
 [COLONY MODEL SELECTION]
 Available models: ${modelList}
@@ -482,7 +449,7 @@ Strategy for choosing per-caste models:
       launchBackgroundColony(colonyParams);
 
       return {
-        content: [{ type: "text", text: `🐜 Colony launched in background!\n\n**Goal:** ${params.goal}\n\nThe colony is now running. You can continue chatting — results will be injected when it finishes.\n\nUse \`/colony-stop\` to cancel, \`/colony-status\` to check progress.` }],
+        content: [{ type: "text", text: `[COLONY_SIGNAL:LAUNCHED]\n🐜 Colony launched in background.\nGoal: ${params.goal}\n\n⚠️ IMPORTANT: The colony is now running autonomously. Do NOT check progress, do NOT ask about status, do NOT assume failure. You will receive a [COLONY_SIGNAL:COMPLETE] message automatically when it finishes. Continue chatting about other topics or wait silently.` }],
       };
     },
 
@@ -508,7 +475,7 @@ Strategy for choosing per-caste models:
       ));
       if (activeColony) {
         container.addChild(new Text(theme.fg("dim", `  Goal: ${activeColony.goal.slice(0, 70)}`), 0, 0));
-        container.addChild(new Text(theme.fg("muted", `  Use /colony-status or check the widget above`), 0, 0));
+        container.addChild(new Text(theme.fg("muted", `  Ctrl+Shift+A for details │ /colony-stop to cancel`), 0, 0));
       }
       return container;
     },
@@ -548,6 +515,99 @@ Strategy for choosing per-caste models:
     }
 
     return container;
+  });
+
+  // ═══ Shortcut: Ctrl+Shift+A 展开蚁群详情 ═══
+  pi.registerShortcut("ctrl+shift+a", {
+    description: "Show ant colony details",
+    async handler(ctx) {
+      if (!activeColony) {
+        ctx.ui.notify("No colony is currently running.", "info");
+        return;
+      }
+
+      await ctx.ui.custom<void>((tui, theme, _kb, done) => {
+        let cachedWidth: number | undefined;
+        let cachedLines: string[] | undefined;
+
+        const buildLines = (width: number): string[] => {
+          const c = activeColony;
+          if (!c) return [theme.fg("muted", "  No colony running.")];
+
+          const lines: string[] = [];
+          const w = width - 2; // padding
+
+          // ── Header ──
+          const elapsed = c.state ? formatDuration(Date.now() - c.state.createdAt) : "0s";
+          const cost = c.state ? formatCost(c.state.metrics.totalCost) : "$0";
+          lines.push(theme.fg("accent", theme.bold(`  🐜 Colony Details`)) + theme.fg("muted", ` │ ${elapsed} │ ${cost}`));
+          lines.push(theme.fg("dim", `  Goal: ${c.goal.slice(0, w - 8)}`));
+          lines.push("");
+
+          // ── Tasks ──
+          const tasks = c.state?.tasks || [];
+          if (tasks.length > 0) {
+            lines.push(theme.fg("accent", "  Tasks"));
+            for (const t of tasks.slice(0, 15)) {
+              const icon = t.status === "done" ? theme.fg("success", "✓")
+                : t.status === "failed" ? theme.fg("error", "✗")
+                : t.status === "active" ? theme.fg("warning", "●")
+                : theme.fg("dim", "○");
+              const dur = t.finishedAt && t.startedAt ? theme.fg("dim", ` ${formatDuration(t.finishedAt - t.startedAt)}`) : "";
+              lines.push(`  ${icon} ${casteIcon(t.caste)} ${theme.fg("text", t.title.slice(0, w - 12))}${dur}`);
+            }
+            if (tasks.length > 15) lines.push(theme.fg("muted", `  ⋯ +${tasks.length - 15} more`));
+            lines.push("");
+          }
+
+          // ── Active Ants ──
+          const streams = Array.from(c.antStreams.values());
+          if (streams.length > 0) {
+            lines.push(theme.fg("accent", "  Active Ants"));
+            for (const s of streams) {
+              const line = s.lastLine.length > w - 20 ? s.lastLine.slice(0, w - 23) + "..." : s.lastLine;
+              lines.push(`  ${casteIcon(s.caste)} ${theme.fg("accent", s.antId.slice(0, 14))} ${theme.fg("dim", `${s.tokens}tok`)} ${theme.fg("muted", "▸")} ${line}`);
+            }
+            lines.push("");
+          }
+
+          // ── Log (last 8) ──
+          if (c.log.length > 0) {
+            lines.push(theme.fg("accent", "  Log"));
+            for (const l of c.log.slice(-8)) {
+              lines.push(theme.fg("dim", `  ${l.slice(0, w - 2)}`));
+            }
+          }
+
+          lines.push("");
+          lines.push(theme.fg("muted", "  esc close"));
+          return lines;
+        };
+
+        // 定时刷新
+        const timer = setInterval(() => {
+          cachedWidth = undefined;
+          cachedLines = undefined;
+          tui.requestRender();
+        }, 1000);
+
+        return {
+          render(width: number): string[] {
+            if (cachedLines && cachedWidth === width) return cachedLines;
+            cachedLines = buildLines(width);
+            cachedWidth = width;
+            return cachedLines;
+          },
+          invalidate() { cachedWidth = undefined; cachedLines = undefined; },
+          handleInput(data: string) {
+            if (matchesKey(data, "escape")) {
+              clearInterval(timer);
+              done(undefined);
+            }
+          },
+        };
+      }, { overlay: true, overlayOptions: { anchor: "center", width: "80%", maxHeight: "80%" } });
+    },
   });
 
   // ═══ Command: /colony-stop ═══

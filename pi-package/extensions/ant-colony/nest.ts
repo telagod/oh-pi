@@ -21,6 +21,7 @@ export class Nest {
   private pheromoneCache: Pheromone[] = [];
   private pheromoneOffset: number = 0;
   private taskCache: Map<string, Task> = new Map();
+  private stateCache: ColonyState | null = null;
 
   constructor(private cwd: string, private colonyId: string) {
     this.dir = path.join(cwd, ".ant-colony", colonyId);
@@ -35,13 +36,16 @@ export class Nest {
 
   init(state: ColonyState): void {
     this.writeJson(this.stateFile, state);
+    this.stateCache = state;
     this.taskCache.clear();
     for (const t of state.tasks) this.writeTask(t);
   }
 
   getState(): ColonyState {
-    const base = this.readJson<ColonyState>(this.stateFile);
-    // 从 tasks/ 目录重建最新任务状态（原子性保证）
+    if (!this.stateCache) {
+      this.stateCache = this.readJson<ColonyState>(this.stateFile);
+    }
+    const base = { ...this.stateCache };
     base.tasks = this.getAllTasks();
     base.pheromones = this.getAllPheromones();
     return base;
@@ -49,9 +53,11 @@ export class Nest {
 
   updateState(patch: Partial<Pick<ColonyState, "status" | "concurrency" | "metrics" | "ants" | "finishedAt">>): void {
     this.withStateLock(() => {
-      const state = this.readJson<ColonyState>(this.stateFile);
-      Object.assign(state, patch);
-      this.writeJson(this.stateFile, state);
+      if (!this.stateCache) {
+        this.stateCache = this.readJson<ColonyState>(this.stateFile);
+      }
+      Object.assign(this.stateCache, patch);
+      this.writeJson(this.stateFile, this.stateCache);
     });
   }
 
@@ -186,11 +192,13 @@ export class Nest {
 
   updateAnt(ant: Ant): void {
     this.withStateLock(() => {
-      const state = this.readJson<ColonyState>(this.stateFile);
-      const idx = state.ants.findIndex(a => a.id === ant.id);
-      if (idx >= 0) state.ants[idx] = ant;
-      else state.ants.push(ant);
-      this.writeJson(this.stateFile, state);
+      if (!this.stateCache) {
+        this.stateCache = this.readJson<ColonyState>(this.stateFile);
+      }
+      const idx = this.stateCache.ants.findIndex(a => a.id === ant.id);
+      if (idx >= 0) this.stateCache.ants[idx] = ant;
+      else this.stateCache.ants.push(ant);
+      this.writeJson(this.stateFile, this.stateCache);
     });
   }
 
@@ -198,12 +206,14 @@ export class Nest {
 
   recordSample(sample: ConcurrencySample): void {
     this.withStateLock(() => {
-      const state = this.readJson<ColonyState>(this.stateFile);
-      state.concurrency.history.push(sample);
-      if (state.concurrency.history.length > 30) {
-        state.concurrency.history = state.concurrency.history.slice(-30);
+      if (!this.stateCache) {
+        this.stateCache = this.readJson<ColonyState>(this.stateFile);
       }
-      this.writeJson(this.stateFile, state);
+      this.stateCache.concurrency.history.push(sample);
+      if (this.stateCache.concurrency.history.length > 30) {
+        this.stateCache.concurrency.history = this.stateCache.concurrency.history.slice(-30);
+      }
+      this.writeJson(this.stateFile, this.stateCache);
     });
   }
 
