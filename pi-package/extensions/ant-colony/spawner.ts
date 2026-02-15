@@ -50,6 +50,7 @@ const CASTE_PROMPTS: Record<AntCaste, string> = {
 Behavior:
 - Quickly scan the codebase to understand structure and locate relevant code
 - Identify files, functions, dependencies related to the goal
+- IMPORTANT: After EACH tool call, summarize what you found so far. Do NOT wait until the end.
 - Report findings as structured intelligence for Worker Ants
 
 Output format (MUST follow exactly):
@@ -261,6 +262,17 @@ export async function spawnAnt(
             const event = JSON.parse(line);
             if (event.type === "turn_end") {
               turnCount++;
+              // 实时提取信息素：从当前所有 assistant 消息中提取发现
+              if (antConfig.caste === "scout") {
+                const currentOutput = getFinalOutput(messages);
+                if (currentOutput) {
+                  const livePheromones = extractPheromones(antId, antConfig.caste, task.id, currentOutput, task.files);
+                  for (const p of livePheromones) {
+                    p.id = makePheromoneId(); // 确保唯一 ID
+                    nest.dropPheromone(p);
+                  }
+                }
+              }
               if (antConfig.maxTurns && turnCount === antConfig.maxTurns) {
                 stderr += `[ant-colony] Warning: ant reached maxTurns (${antConfig.maxTurns}), 1 grace turn remaining\n`;
               } else if (antConfig.maxTurns && turnCount > antConfig.maxTurns) {
@@ -328,12 +340,12 @@ export async function spawnAnt(
       return { ant, output, messages, newTasks: [], pheromones: [], rateLimited: true };
     }
 
-    nest.updateTaskStatus(task.id, success ? "done" : "failed", output, success ? undefined : stderr || output);
-
-    // 解析子任务和信息素
+    // 无论成功或失败，都尝试解析子任务和信息素（支持部分产出）
     const newTasks = parseSubTasks(output);
     const pheromones = extractPheromones(antId, antConfig.caste, task.id, output, task.files);
     for (const p of pheromones) nest.dropPheromone(p);
+
+    nest.updateTaskStatus(task.id, success ? "done" : "failed", output, success ? undefined : stderr || output);
 
     return { ant, output, messages, newTasks, pheromones, rateLimited: false };
   } finally {

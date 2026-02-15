@@ -323,7 +323,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   };
 
   try {
-    // ═══ Phase 1: 侦察（最多重试2次） ═══
+    // ═══ Phase 1: 侦察（接力机制） ═══
     let scoutAttempt = 0;
     const MAX_SCOUT_RETRIES = 2;
     let workerTasks: Task[] = [];
@@ -331,7 +331,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     while (scoutAttempt <= MAX_SCOUT_RETRIES) {
       callbacks.onPhase("scouting", scoutAttempt === 0
         ? "Dispatching scout ants to explore codebase..."
-        : `Scout retry ${scoutAttempt}/${MAX_SCOUT_RETRIES}...`);
+        : `Scout relay ${scoutAttempt}/${MAX_SCOUT_RETRIES} (building on previous discoveries)...`);
 
       await runAntWave({ ...waveBase, caste: "scout" });
 
@@ -340,10 +340,33 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 
       scoutAttempt++;
       if (scoutAttempt <= MAX_SCOUT_RETRIES) {
-        // 重置失败的 scout 任务为 pending 以便重试
-        for (const t of nest.getAllTasks().filter(t => t.caste === "scout" && (t.status === "done" || t.status === "failed"))) {
-          nest.updateTaskStatus(t.id, "pending");
-        }
+        // 接力：检查是否有信息素（前一只 scout 的部分发现）
+        const pheromones = nest.getAllPheromones();
+        const hasDiscoveries = pheromones.some(p => p.type === "discovery");
+
+        // 创建接力 scout 任务（而非重置旧任务）
+        const relayDescription = hasDiscoveries
+          ? `Continue exploring the codebase. Previous scouts made partial discoveries (see pheromone trail). Focus on areas NOT yet explored and generate worker tasks.\n\nOriginal goal:\n${opts.goal}`
+          : `Explore the codebase and identify all files, modules, and dependencies relevant to this goal:\n\n${opts.goal}\n\nBe thorough. The colony depends on your intelligence.`;
+
+        const relayTask: Task = {
+          id: makeTaskId(),
+          parentId: null,
+          title: hasDiscoveries ? "Scout relay: continue exploration" : "Scout: explore codebase for goal",
+          description: relayDescription,
+          caste: "scout",
+          status: "pending",
+          priority: 1,
+          files: [],
+          claimedBy: null,
+          result: null,
+          error: null,
+          spawnedTasks: [],
+          createdAt: Date.now(),
+          startedAt: null,
+          finishedAt: null,
+        };
+        nest.writeTask(relayTask);
       }
     }
 
