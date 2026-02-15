@@ -550,18 +550,6 @@ Strategy for choosing per-caste models:
     return container;
   });
 
-  // ═══ Command: /colony ═══
-  pi.registerCommand("colony", {
-    description: "Launch an ant colony in background. Usage: /colony <goal>",
-    async handler(args, ctx) {
-      if (!args?.trim()) {
-        ctx.ui.notify("Usage: /colony <goal>", "warning");
-        return;
-      }
-      pi.sendUserMessage(`Use the ant_colony tool with goal: ${args.trim()}`);
-    },
-  });
-
   // ═══ Command: /colony-stop ═══
   pi.registerCommand("colony-stop", {
     description: "Stop the running background colony",
@@ -572,52 +560,6 @@ Strategy for choosing per-caste models:
       }
       activeColony.abortController.abort();
       ctx.ui.notify("🐜 Colony abort signal sent. Waiting for ants to finish...", "warning");
-    },
-  });
-
-  // ═══ Command: /colony-status ═══
-  pi.registerCommand("colony-status", {
-    description: "Show status of the running or last colony",
-    async handler(_args, ctx) {
-      if (activeColony) {
-        const { state, phase, antStreams, log } = activeColony;
-        const m = state?.metrics;
-        const active = antStreams.size;
-        const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "?";
-        ctx.ui.notify(
-          `🐜 Running: ${phase} │ ${elapsed} │ ${m ? `${m.tasksDone}/${m.tasksTotal} tasks` : "?"} │ ${active} active │ ${m ? formatCost(m.totalCost) : "$0"}`,
-          "info",
-        );
-        return;
-      }
-
-      // 从 session 找最近的报告
-      const entries = ctx.sessionManager.getEntries();
-      for (let i = entries.length - 1; i >= 0; i--) {
-        const e = entries[i] as any;
-        if (e.type === "message" && e.message?.customType === "ant-colony-report") {
-          const content = e.message.content || "";
-          const statusMatch = content.match(/\*\*Status:\*\* (.+)/);
-          ctx.ui.notify(`🐜 Last colony: ${statusMatch?.[1] || "unknown"}`, "info");
-          return;
-        }
-      }
-      ctx.ui.notify("No colony run found.", "info");
-    },
-  });
-
-  // ═══ Shortcut: Ctrl+Alt+A ═══
-  pi.registerShortcut("ctrl+alt+a", {
-    description: "Quick launch ant colony from editor content",
-    async handler(ctx) {
-      if (activeColony) {
-        ctx.ui.notify("A colony is already running. Use /colony-stop first.", "warning");
-        return;
-      }
-      const text = await ctx.ui.input("Ant Colony Goal", "What should the colony accomplish?");
-      if (text?.trim()) {
-        pi.sendUserMessage(`Use the ant_colony tool to accomplish this goal: ${text.trim()}`);
-      }
     },
   });
 
