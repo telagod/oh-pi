@@ -1,5 +1,5 @@
 /**
- * oh-pi Compact Header — replaces verbose startup with dense, styled info block
+ * oh-pi Compact Header — aligned, scannable startup info
  */
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { VERSION } from "@mariozechner/pi-coding-agent";
@@ -13,42 +13,48 @@ export default function (pi: ExtensionAPI) {
       render(width: number): string[] {
         const d = (s: string) => theme.fg("dim", s);
         const a = (s: string) => theme.fg("accent", s);
-        const m = (s: string) => theme.fg("muted", s);
-        const bar = d("─".repeat(width));
 
         const cmds = pi.getCommands();
-        const prompts = cmds.filter(c => c.source === "prompt").map(c => `/${c.name}`);
-        const skills = cmds.filter(c => c.source === "skill").map(c => c.name);
-
+        const prompts = cmds.filter(c => c.source === "prompt").map(c => `/${c.name}`).join("  ");
+        const skills = cmds.filter(c => c.source === "skill").map(c => c.name).join("  ");
         const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no model";
         const thinking = pi.getThinkingLevel();
+        const t = (s: string) => truncateToWidth(s, width);
+        const bar = d("─".repeat(width));
 
-        // Line 1: pi version + model + thinking
-        const l1 = `${a("pi")} ${d(`v${VERSION}`)}  ${m(model)}  ${d("thinking:")}${a(thinking)}`;
-
-        // Line 2: keybindings (compact)
-        const keys = [
-          `${a("esc")}${d(":")}interrupt`,
-          `${a("^C")}${d(":")}clear`,
-          `${a("^P")}${d(":")}model`,
-          `${a("S-tab")}${d(":")}thinking`,
-          `${a("^O")}${d(":")}expand`,
-          `${a("/")}${d(":")}cmd`,
-          `${a("!")}${d(":")}bash`,
-          `${a("^G")}${d(":")}editor`,
-        ].join(d("  "));
-
-        // Line 3: prompts + skills
-        const parts: string[] = [];
-        if (prompts.length) parts.push(`${d("prompts")} ${a(prompts.join(" "))}`);
-        if (skills.length) parts.push(`${d("skills")} ${a(skills.join(" "))}`);
-
-        const lines = [
-          "",
-          truncateToWidth(l1, width),
-          truncateToWidth(keys, width),
+        // Column-aligned key=value pairs
+        const col1 = [
+          [d("version"), a(`v${VERSION}`)],
+          [d("  model"), a(model)],
+          [d("  think"), a(thinking)],
         ];
-        if (parts.length) lines.push(truncateToWidth(parts.join(d("  │  ")), width));
+        const col2 = [
+          [a("esc"), d("interrupt")],
+          [a("^C"), d("clear/exit")],
+          [a("^P"), d("cycle model")],
+        ];
+        const col3 = [
+          [a("S-tab"), d("thinking")],
+          [a("^O"), d("expand")],
+          [a("^G"), d("ext editor")],
+        ];
+        const col4 = [
+          [a("/"), d("commands")],
+          [a("!"), d("bash")],
+          [a("^V"), d("paste img")],
+        ];
+
+        const lines: string[] = [""];
+        for (let i = 0; i < 3; i++) {
+          const [k1, v1] = col1[i];
+          const [k2, v2] = col2[i];
+          const [k3, v3] = col3[i];
+          const [k4, v4] = col4[i];
+          lines.push(t(`${k1} ${v1}    ${k2} ${v2}    ${k3} ${v3}    ${k4} ${v4}`));
+        }
+
+        if (prompts) lines.push(t(`${d("prompts")} ${a(prompts)}`));
+        if (skills) lines.push(t(`${d(" skills")} ${a(skills)}`));
         lines.push(bar);
 
         return lines;
