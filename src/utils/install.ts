@@ -65,11 +65,8 @@ export function applyConfig(config: OhPConfig) {
   const primary = config.providers.find(p => p.baseUrl && p.defaultModel) ?? config.providers[0];
   const providerInfo = primary ? PROVIDERS[primary.name] : undefined;
   const compactThreshold = config.compactThreshold ?? 0.75;
+  const reserveTokens = 32000;
   const primaryModel = primary?.defaultModel ?? providerInfo?.models[0];
-  const primaryDisc = primary?.discoveredModels?.find(m => m.id === primaryModel);
-  const primaryCaps = primaryModel ? MODEL_CAPABILITIES[primaryModel] : undefined;
-  const contextWindow = primaryDisc?.contextWindow ?? primary?.contextWindow ?? primaryCaps?.contextWindow ?? 128000;
-  const reserveTokens = Math.round(contextWindow * (1 - compactThreshold));
   const settings: Record<string, unknown> = {
     ...(primary ? { defaultProvider: primary.name, defaultModel: primaryModel } : {}),
     defaultThinkingLevel: config.thinking,
