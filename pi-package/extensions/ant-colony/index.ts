@@ -10,7 +10,7 @@
 import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text, Container, Spacer } from "@mariozechner/pi-tui";
+import { Text, Container, Spacer, Box } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
 import type { ColonyState, ColonyMetrics, Ant, Task } from "./types.js";
@@ -46,6 +46,33 @@ function statusIcon(status: string): string {
 
 function casteIcon(caste: string): string {
   return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : "⚒️";
+}
+
+/** 渲染进度条 ▓░ */
+function progressBar(done: number, total: number, width: number, theme: any): string {
+  if (total === 0) return "";
+  const pct = Math.min(done / total, 1);
+  const filled = Math.round(pct * width);
+  const empty = width - filled;
+  const bar = theme.fg("success", "█".repeat(filled)) + theme.fg("muted", "░".repeat(empty));
+  return `${bar} ${theme.fg("accent", `${done}/${total}`)}`;
+}
+
+/** 渲染阶段流水线 scout → work → review → done */
+function phasePipeline(status: string, theme: any): string {
+  const phases = [
+    { key: "scouting",  icon: "🔍", label: "Scout" },
+    { key: "working",   icon: "⚒️",  label: "Work" },
+    { key: "reviewing", icon: "🛡️", label: "Review" },
+    { key: "done",      icon: "✅", label: "Done" },
+  ];
+  const idx = phases.findIndex(p => p.key === status);
+  return phases.map((p, i) => {
+    const label = `${p.icon} ${p.label}`;
+    if (i < idx) return theme.fg("success", label);
+    if (i === idx) return theme.fg("accent", theme.bold(label));
+    return theme.fg("muted", label);
+  }).join(theme.fg("muted", " → "));
 }
 
 
@@ -202,108 +229,136 @@ For simple single-file tasks, work directly without the colony.`,
     // ═══ TUI Rendering ═══
 
     renderCall(args, theme) {
-      let text = theme.fg("toolTitle", theme.bold("ant_colony "));
-      text += theme.fg("accent", "🐜");
-      const goal = args.goal?.length > 60 ? args.goal.slice(0, 57) + "..." : args.goal;
-      text += "\n  " + theme.fg("dim", goal || "...");
-      if (args.maxAnts) text += theme.fg("muted", ` (max: ${args.maxAnts})`);
-      if (args.maxCost) text += theme.fg("warning", ` (budget: $${args.maxCost})`);
+      const goal = args.goal?.length > 70 ? args.goal.slice(0, 67) + "..." : args.goal;
+      let text = theme.fg("toolTitle", theme.bold("🐜 ant_colony"));
+      if (args.maxAnts) text += theme.fg("muted", ` ×${args.maxAnts}`);
+      if (args.maxCost) text += theme.fg("warning", ` $${args.maxCost}`);
+      text += "\n" + theme.fg("dim", `  ${goal || "..."}`);
       return new Text(text, 0, 0);
     },
 
     renderResult(result, { expanded }, theme) {
       const details = result.details as ColonyDetails | undefined;
+
+      // ─── 运行中 ───
       if (!details?.state) {
-        // Still running or no state
         const log = details?.log ?? [];
-        let text = theme.fg("warning", "🐜 ") + theme.fg("toolTitle", details?.phase || "initializing...");
-        const recent = log.slice(expanded ? -30 : -8);
+        const container = new Container();
+        container.addChild(new Text(
+          theme.fg("warning", "🐜 ") + theme.fg("toolTitle", theme.bold("Colony ")) +
+          theme.fg("accent", details?.phase || "initializing..."),
+          0, 0,
+        ));
+        const recent = log.slice(expanded ? -20 : -5);
         if (recent.length > 0) {
-          text += "\n" + recent.map(l => theme.fg("dim", l)).join("\n");
+          container.addChild(new Text(recent.map(l => theme.fg("dim", `  ${l}`)).join("\n"), 0, 0));
         }
-        if (!expanded && log.length > 8) {
-          text += "\n" + theme.fg("muted", `... ${log.length - 8} more (Ctrl+O to expand)`);
+        if (!expanded && log.length > 5) {
+          container.addChild(new Text(theme.fg("muted", `  ⋯ ${log.length - 5} more`), 0, 0));
         }
-        return new Text(text, 0, 0);
+        return container;
       }
 
       const state = details.state;
       const m = state.metrics;
-      const icon = state.status === "done" ? theme.fg("success", "✓") : theme.fg("error", "✗");
       const elapsed = state.finishedAt ? formatDuration(state.finishedAt - state.createdAt) : "?";
+      const ok = state.status === "done";
 
+      // ─── 折叠视图 ───
       if (!expanded) {
-        let text = `${icon} ${theme.fg("toolTitle", theme.bold("ant colony "))}`;
-        text += theme.fg("accent", `${m.tasksDone}/${m.tasksTotal} tasks`);
-        text += theme.fg("muted", ` | ${m.antsSpawned} ants | ${elapsed} | ${formatCost(m.totalCost)}`);
-        text += theme.fg("muted", ` | peak ×${state.concurrency.optimal}`);
+        const container = new Container();
 
-        // Compact task list
-        for (const t of state.tasks.slice(0, 5)) {
-          const ti = t.status === "done" ? theme.fg("success", "✓") : t.status === "failed" ? theme.fg("error", "✗") : theme.fg("muted", "○");
-          text += `\n  ${ti} ${theme.fg("dim", `[${t.caste}]`)} ${t.title.slice(0, 60)}`;
+        // 标题行：状态 + 统计
+        const icon = ok ? theme.fg("success", "✓") : theme.fg("error", "✗");
+        container.addChild(new Text(
+          `${icon} ${theme.fg("toolTitle", theme.bold("ant colony "))}` +
+          theme.fg("muted", `${elapsed} │ `) +
+          theme.fg("accent", `${m.antsSpawned} ants`) +
+          theme.fg("muted", ` │ ${formatTokens(m.totalTokens)} │ ${formatCost(m.totalCost)}`),
+          0, 0,
+        ));
+
+        // 进度条
+        container.addChild(new Text(`  ${progressBar(m.tasksDone, m.tasksTotal, 20, theme)} ${theme.fg("muted", `(${m.tasksFailed} failed)`)}`, 0, 0));
+
+        // 任务列表（最多6条）
+        for (const t of state.tasks.slice(0, 6)) {
+          const ti = t.status === "done" ? theme.fg("success", "✓")
+            : t.status === "failed" ? theme.fg("error", "✗")
+            : theme.fg("muted", "○");
+          container.addChild(new Text(
+            `  ${ti} ${theme.fg("dim", `${casteIcon(t.caste)}`)} ${t.title.slice(0, 60)}`,
+            0, 0,
+          ));
         }
-        if (state.tasks.length > 5) text += `\n  ${theme.fg("muted", `... +${state.tasks.length - 5} more`)}`;
-        text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
-        return new Text(text, 0, 0);
+        if (state.tasks.length > 6) {
+          container.addChild(new Text(theme.fg("muted", `  ⋯ +${state.tasks.length - 6} more (Ctrl+O)`), 0, 0));
+        }
+
+        return container;
       }
 
-      // Expanded view
+      // ─── 展开视图 ───
       const container = new Container();
+
+      // 标题 + 阶段流水线
+      const icon = ok ? theme.fg("success", "✓") : theme.fg("error", "✗");
       container.addChild(new Text(
         `${icon} ${theme.fg("toolTitle", theme.bold("ant colony "))}` +
         theme.fg("accent", state.status) +
-        theme.fg("muted", ` | ${elapsed} | ${formatCost(m.totalCost)} | ${formatTokens(m.totalTokens)} tokens | peak ×${state.concurrency.optimal}`),
+        theme.fg("muted", ` │ ${elapsed} │ ${formatCost(m.totalCost)} │ ${formatTokens(m.totalTokens)} tokens`),
         0, 0,
       ));
-      container.addChild(new Text(theme.fg("dim", state.goal), 0, 0));
-      container.addChild(new Spacer(1));
+      container.addChild(new Text(`  ${phasePipeline(state.status, theme)}`, 0, 0));
+      container.addChild(new Text(theme.fg("dim", `  ${state.goal}`), 0, 0));
 
-      // Tasks
-      container.addChild(new Text(theme.fg("muted", `─── Tasks (${m.tasksDone}/${m.tasksTotal}) ───`), 0, 0));
+      // 进度条
+      container.addChild(new Spacer(1));
+      container.addChild(new Text(`  ${progressBar(m.tasksDone, m.tasksTotal, 30, theme)}`, 0, 0));
+
+      // 任务区
+      container.addChild(new Spacer(1));
+      container.addChild(new Text(theme.fg("muted", `  ─── Tasks (${m.tasksDone}/${m.tasksTotal}) ───`), 0, 0));
       for (const t of state.tasks) {
         const ti = t.status === "done" ? theme.fg("success", "✓")
           : t.status === "failed" ? theme.fg("error", "✗")
-          : t.status === "active" ? theme.fg("warning", "⏳")
+          : t.status === "active" ? theme.fg("warning", "◉")
           : theme.fg("muted", "○");
-        let line = `${ti} ${theme.fg("accent", `[${t.caste}]`)} ${t.title}`;
-        if (t.finishedAt && t.startedAt) line += theme.fg("dim", ` (${formatDuration(t.finishedAt - t.startedAt)})`);
-        container.addChild(new Text(line, 0, 0));
+        const dur = (t.finishedAt && t.startedAt) ? theme.fg("dim", ` ${formatDuration(t.finishedAt - t.startedAt)}`) : "";
+        container.addChild(new Text(`  ${ti} ${casteIcon(t.caste)} ${t.title}${dur}`, 0, 0));
         if (t.status === "done" && t.result) {
-          const preview = t.result.split("\n").slice(0, 2).join("\n").slice(0, 120);
-          container.addChild(new Text(theme.fg("dim", `  ${preview}`), 0, 0));
+          container.addChild(new Text(theme.fg("dim", `    ${t.result.split("\n")[0]?.slice(0, 100)}`), 0, 0));
         }
         if (t.status === "failed" && t.error) {
-          container.addChild(new Text(theme.fg("error", `  ${t.error.slice(0, 120)}`), 0, 0));
+          container.addChild(new Text(theme.fg("error", `    ${t.error.slice(0, 100)}`), 0, 0));
         }
       }
 
-      // Ants
+      // 蚂蚁区
       container.addChild(new Spacer(1));
-      container.addChild(new Text(theme.fg("muted", `─── Ants (${m.antsSpawned}) ───`), 0, 0));
+      container.addChild(new Text(theme.fg("muted", `  ─── Ants (${m.antsSpawned}) ───`), 0, 0));
       for (const a of state.ants) {
-        const ai = a.status === "done" ? theme.fg("success", "✓") : a.status === "failed" ? theme.fg("error", "✗") : theme.fg("warning", "⏳");
+        const ai = a.status === "done" ? theme.fg("success", "✓") : a.status === "failed" ? theme.fg("error", "✗") : theme.fg("warning", "◉");
         const dur = a.finishedAt ? formatDuration(a.finishedAt - a.startedAt) : "...";
         container.addChild(new Text(
-          `${ai} ${casteIcon(a.caste)} ${theme.fg("accent", a.id)} ${theme.fg("dim", `${dur} ${formatCost(a.usage.cost)} ${a.usage.turns}t`)}`,
+          `  ${ai} ${casteIcon(a.caste)} ${theme.fg("accent", a.id)} ${theme.fg("dim", `${dur} │ ${formatCost(a.usage.cost)} │ ${a.usage.turns}t`)}`,
           0, 0,
         ));
       }
 
-      // Concurrency
+      // 并发 + 日志
       container.addChild(new Spacer(1));
       const c = state.concurrency;
       container.addChild(new Text(
-        theme.fg("muted", `─── Concurrency ───`) + `\n` +
-        theme.fg("dim", `current: ${c.current} | optimal: ${c.optimal} | range: ${c.min}-${c.max} | samples: ${c.history.length}`),
+        theme.fg("muted", `  ─── Concurrency ───`) + "\n" +
+        theme.fg("dim", `  current: ${c.current} │ optimal: ${c.optimal} │ range: ${c.min}-${c.max}`),
         0, 0,
       ));
 
-      // Activity log
       container.addChild(new Spacer(1));
-      container.addChild(new Text(theme.fg("muted", "─── Log ───"), 0, 0));
-      for (const l of details.log.slice(-20)) {
-        container.addChild(new Text(theme.fg("dim", l), 0, 0));
+      container.addChild(new Text(theme.fg("muted", `  ─── Log ───`), 0, 0));
+      for (const l of details.log.slice(-15)) {
+        container.addChild(new Text(theme.fg("dim", `  ${l}`), 0, 0));
       }
 
       return container;
