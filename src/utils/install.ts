@@ -62,6 +62,7 @@ export function applyConfig(config: OhPConfig) {
     enableSkillCommands: true,
     compaction: { enabled: true, reserveTokens, keepRecentTokens: 20000 },
     retry: { enabled: true, maxRetries: 3 },
+    quietStartup: true,
   };
   if (config.providers.length > 1) {
     settings.enabledModels = config.providers.flatMap((p) => {
