@@ -241,21 +241,79 @@ For simple single-file tasks, work directly without the colony.`,
       const details = result.details as ColonyDetails | undefined;
 
       // ─── 运行中 ───
-      if (!details?.state) {
+      if (!details?.state || (details.state.status !== "done" && details.state.status !== "failed")) {
+        const state = details?.state;
         const log = details?.log ?? [];
         const container = new Container();
-        container.addChild(new Text(
-          theme.fg("warning", "🐜 ") + theme.fg("toolTitle", theme.bold("Colony ")) +
-          theme.fg("accent", details?.phase || "initializing..."),
-          0, 0,
-        ));
-        const recent = log.slice(expanded ? -20 : -5);
-        if (recent.length > 0) {
-          container.addChild(new Text(recent.map(l => theme.fg("dim", `  ${l}`)).join("\n"), 0, 0));
+
+        if (state) {
+          const m = state.metrics;
+          const elapsed = formatDuration(Date.now() - state.createdAt);
+
+          // 标题行：● N ants launched (phase)
+          const activeAnts = state.ants.filter(a => a.status === "working");
+          const totalAnts = state.ants.length;
+          container.addChild(new Text(
+            theme.fg("warning", "● ") +
+            theme.fg("toolTitle", theme.bold(`${totalAnts} ant${totalAnts !== 1 ? "s" : ""} launched `)) +
+            theme.fg("muted", `(${state.status}) `) +
+            theme.fg("dim", `${elapsed} │ ${formatCost(m.totalCost)}`),
+            0, 0,
+          ));
+
+          // 进度条
+          if (m.tasksTotal > 0) {
+            container.addChild(new Text(`  ${progressBar(m.tasksDone, m.tasksTotal, 20, theme)}`, 0, 0));
+          }
+
+          // 蚂蚁树
+          const ants = expanded ? state.ants : state.ants.slice(-8);
+          for (let i = 0; i < ants.length; i++) {
+            const a = ants[i];
+            const isLast = i === ants.length - 1;
+            const branch = isLast ? "└─" : "├─";
+            const pipe = isLast ? "   " : "│  ";
+
+            const statusDot = a.status === "working" ? theme.fg("warning", "◉")
+              : a.status === "done" ? theme.fg("success", "✓")
+              : theme.fg("error", "✗");
+
+            const task = state.tasks.find(t => t.id === a.taskId);
+            const taskTitle = task?.title?.slice(0, 55) || "...";
+            const dur = a.finishedAt ? formatDuration(a.finishedAt - a.startedAt) : formatDuration(Date.now() - a.startedAt);
+            const turns = a.usage.turns > 0 ? `${a.usage.turns}t` : "";
+
+            container.addChild(new Text(
+              theme.fg("muted", `  ${branch} `) + statusDot + " " +
+              theme.fg("accent", `@${a.id.slice(0, 20)} `) +
+              theme.fg("dim", `(${a.caste}) ${dur}${turns ? " │ " + turns : ""}`),
+              0, 0,
+            ));
+            container.addChild(new Text(
+              theme.fg("muted", `  ${pipe}`) + theme.fg("dim", `⎿  ${taskTitle}`),
+              0, 0,
+            ));
+          }
+          if (!expanded && state.ants.length > 8) {
+            container.addChild(new Text(theme.fg("muted", `  ⋯ +${state.ants.length - 8} more (expand to see all)`), 0, 0));
+          }
+        } else {
+          container.addChild(new Text(
+            theme.fg("warning", "● ") + theme.fg("toolTitle", theme.bold("Colony ")) +
+            theme.fg("accent", details?.phase || "initializing..."),
+            0, 0,
+          ));
         }
-        if (!expanded && log.length > 5) {
-          container.addChild(new Text(theme.fg("muted", `  ⋯ ${log.length - 5} more`), 0, 0));
+
+        // 最近日志（仅展开时）
+        if (expanded && log.length > 0) {
+          container.addChild(new Spacer(1));
+          const recent = log.slice(-10);
+          for (const l of recent) {
+            container.addChild(new Text(theme.fg("dim", `  ${l}`), 0, 0));
+          }
         }
+
         return container;
       }
 
