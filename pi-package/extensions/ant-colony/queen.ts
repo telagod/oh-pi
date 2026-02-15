@@ -353,16 +353,32 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   };
 
   try {
-    // ═══ Phase 1: 侦察 ═══
-    callbacks.onPhase("scouting", "Dispatching scout ants to explore codebase...");
-    if (await runAntWave({ ...waveBase, caste: "scout" }) === "budget_exceeded")
-      return budgetStop("Budget exceeded during scouting");
+    // ═══ Phase 1: 侦察（最多重试2次） ═══
+    let scoutAttempt = 0;
+    const MAX_SCOUT_RETRIES = 2;
+    let workerTasks: Task[] = [];
 
-    // 检查侦察结果，如果没有产生工蚁任务，用侦察结果让女王自己拆
-    const postScout = nest.getAllTasks();
-    const workerTasks = postScout.filter(t => t.caste === "worker" && t.status === "pending");
+    while (scoutAttempt <= MAX_SCOUT_RETRIES) {
+      callbacks.onPhase("scouting", scoutAttempt === 0
+        ? "Dispatching scout ants to explore codebase..."
+        : `Scout retry ${scoutAttempt}/${MAX_SCOUT_RETRIES}...`);
+
+      if (await runAntWave({ ...waveBase, caste: "scout" }) === "budget_exceeded")
+        return budgetStop("Budget exceeded during scouting");
+
+      workerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
+      if (workerTasks.length > 0) break;
+
+      scoutAttempt++;
+      if (scoutAttempt <= MAX_SCOUT_RETRIES) {
+        // 重置失败的 scout 任务为 pending 以便重试
+        for (const t of nest.getAllTasks().filter(t => t.caste === "scout" && (t.status === "done" || t.status === "failed"))) {
+          nest.updateTaskStatus(t.id, "pending");
+        }
+      }
+    }
+
     if (workerTasks.length === 0) {
-      // 侦察蚁没产生任务，标记失败
       nest.updateState({ status: "failed", finishedAt: Date.now() });
       const finalState = nest.getState();
       callbacks.onComplete(finalState);
