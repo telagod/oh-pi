@@ -15,12 +15,14 @@ import type { ColonyState, Task, Pheromone, Ant, TaskStatus, ConcurrencySample }
 export class Nest {
   readonly dir: string;
   private stateFile: string;
+  private lockFile: string;
   private pheromoneFile: string;
   private tasksDir: string;
 
   constructor(private cwd: string, private colonyId: string) {
     this.dir = path.join(cwd, ".ant-colony", colonyId);
     this.stateFile = path.join(this.dir, "state.json");
+    this.lockFile = path.join(this.dir, "state.lock");
     this.pheromoneFile = path.join(this.dir, "pheromone.jsonl");
     this.tasksDir = path.join(this.dir, "tasks");
     fs.mkdirSync(this.tasksDir, { recursive: true });
@@ -42,9 +44,11 @@ export class Nest {
   }
 
   updateState(patch: Partial<Pick<ColonyState, "status" | "concurrency" | "metrics" | "ants" | "finishedAt">>): void {
-    const state = this.readJson<ColonyState>(this.stateFile);
-    Object.assign(state, patch);
-    this.writeJson(this.stateFile, state);
+    this.withStateLock(() => {
+      const state = this.readJson<ColonyState>(this.stateFile);
+      Object.assign(state, patch);
+      this.writeJson(this.stateFile, state);
+    });
   }
 
   // ═══ Tasks (Food) ═══
@@ -157,23 +161,26 @@ export class Nest {
   // ═══ Ants ═══
 
   updateAnt(ant: Ant): void {
-    const state = this.readJson<ColonyState>(this.stateFile);
-    const idx = state.ants.findIndex(a => a.id === ant.id);
-    if (idx >= 0) state.ants[idx] = ant;
-    else state.ants.push(ant);
-    this.writeJson(this.stateFile, state);
+    this.withStateLock(() => {
+      const state = this.readJson<ColonyState>(this.stateFile);
+      const idx = state.ants.findIndex(a => a.id === ant.id);
+      if (idx >= 0) state.ants[idx] = ant;
+      else state.ants.push(ant);
+      this.writeJson(this.stateFile, state);
+    });
   }
 
   // ═══ Concurrency Sampling ═══
 
   recordSample(sample: ConcurrencySample): void {
-    const state = this.readJson<ColonyState>(this.stateFile);
-    state.concurrency.history.push(sample);
-    // 只保留最近 30 个样本
-    if (state.concurrency.history.length > 30) {
-      state.concurrency.history = state.concurrency.history.slice(-30);
-    }
-    this.writeJson(this.stateFile, state);
+    this.withStateLock(() => {
+      const state = this.readJson<ColonyState>(this.stateFile);
+      state.concurrency.history.push(sample);
+      if (state.concurrency.history.length > 30) {
+        state.concurrency.history = state.concurrency.history.slice(-30);
+      }
+      this.writeJson(this.stateFile, state);
+    });
   }
 
   // ═══ Cleanup ═══
@@ -183,6 +190,31 @@ export class Nest {
   }
 
   // ═══ Internal ═══
+
+  private withStateLock<T>(fn: () => T): T {
+    const MAX_WAIT = 5000;
+    const SPIN_MS = 10;
+    const start = Date.now();
+    while (true) {
+      try {
+        fs.writeFileSync(this.lockFile, `${process.pid}`, { flag: "wx" });
+        break;
+      } catch {
+        if (Date.now() - start > MAX_WAIT) {
+          // 超时强制清除死锁
+          try { fs.unlinkSync(this.lockFile); } catch { /* ignore */ }
+          continue;
+        }
+        const wait = SPIN_MS + Math.random() * SPIN_MS;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
+      }
+    }
+    try {
+      return fn();
+    } finally {
+      try { fs.unlinkSync(this.lockFile); } catch { /* ignore */ }
+    }
+  }
 
   private writeJson(file: string, data: unknown): void {
     const tmp = file + ".tmp";

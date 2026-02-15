@@ -7,6 +7,8 @@
  * - TUI 渲染：实时显示蚁群状态
  */
 
+import { readFileSync, appendFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text, Container, Spacer } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
@@ -141,6 +143,13 @@ For simple single-file tasks, work directly without the colony.`,
       };
 
       try {
+        // Ensure .ant-colony/ is in .gitignore
+        const gitignorePath = join(ctx.cwd, ".gitignore");
+        const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
+        if (!content.includes(".ant-colony/")) {
+          appendFileSync(gitignorePath, `${content.length && !content.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
+        }
+
         const state = await runColony({
           cwd: ctx.cwd,
           goal: params.goal,
