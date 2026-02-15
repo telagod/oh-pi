@@ -1,3 +1,12 @@
+/** 动态发现的模型信息 */
+export interface DiscoveredModel {
+  id: string;
+  reasoning: boolean;
+  input: ("text" | "image")[];
+  contextWindow: number;
+  maxTokens: number;
+}
+
 /** 模型提供商配置 */
 export interface ProviderConfig {
   /** 提供商名称 */
@@ -8,6 +17,10 @@ export interface ProviderConfig {
   defaultModel?: string;
   /** 自定义 API 地址 */
   baseUrl?: string;
+  /** 检测到的 API 类型 */
+  api?: string;
+  /** 动态发现的所有模型 */
+  discoveredModels?: DiscoveredModel[];
   /** 上下文窗口大小（自定义提供商用） */
   contextWindow?: number;
   /** 最大输出 token 数（自定义提供商用） */

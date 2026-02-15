@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { t } from "../i18n.js";
-import { PROVIDERS, type ProviderConfig } from "../types.js";
+import { PROVIDERS, type ProviderConfig, type DiscoveredModel } from "../types.js";
 import type { EnvInfo } from "../utils/detect.js";
 
 /** Provider API base URLs for dynamic model fetching */
@@ -15,57 +15,90 @@ const PROVIDER_API_URLS: Record<string, string> = {
   mistral:    "https://api.mistral.ai",
 };
 
-/** Fetch models dynamically — tries multiple API styles */
-async function fetchModels(provider: string, baseUrl: string, apiKey: string): Promise<string[]> {
+interface FetchResult {
+  models: DiscoveredModel[];
+  api?: string;
+}
+
+/** Fetch models dynamically — tries multiple API styles, returns metadata + detected API type */
+async function fetchModels(provider: string, baseUrl: string, apiKey: string): Promise<FetchResult> {
   const base = baseUrl.replace(/\/+$/, "");
   const resolvedKey = process.env[apiKey] ?? apiKey;
 
-  // Try Anthropic-style: GET /v1/models with x-api-key header
-  if (provider === "anthropic") {
-    try {
-      const res = await fetch(`${base}/v1/models`, {
-        headers: { "x-api-key": resolvedKey, "anthropic-version": "2023-06-01" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) {
-        const json = await res.json() as { data?: { id: string }[] };
-        const models = (json.data ?? []).map(m => m.id).sort();
-        if (models.length > 0) return models;
+  // Try Anthropic-style first (for known anthropic or any provider)
+  try {
+    const res = await fetch(`${base}/v1/models`, {
+      headers: { "x-api-key": resolvedKey, "anthropic-version": "2023-06-01" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const json = await res.json() as { data?: any[] };
+      const data = json.data ?? [];
+      if (data.length > 0 && data[0].owned_by === "anthropic") {
+        return {
+          api: "anthropic-messages",
+          models: data.map(m => ({
+            id: m.id,
+            reasoning: m.thinking_enabled ?? false,
+            input: ["text", "image"] as ("text" | "image")[],
+            contextWindow: m.max_tokens ?? 200000,
+            maxTokens: m.thinking_enabled ? Math.min(m.max_tokens ?? 128000, 128000) : Math.min(m.max_tokens ?? 8192, 16384),
+          })).sort((a: DiscoveredModel, b: DiscoveredModel) => a.id.localeCompare(b.id)),
+        };
       }
-    } catch { /* fall through */ }
-  }
+    }
+  } catch { /* fall through */ }
 
-  // Try Google-style: GET /v1beta/models with key param
+  // Try Google-style
   if (provider === "google") {
     try {
       const res = await fetch(`${base}/v1beta/models?key=${resolvedKey}`, {
         signal: AbortSignal.timeout(8000),
       });
       if (res.ok) {
-        const json = await res.json() as { models?: { name: string }[] };
-        const models = (json.models ?? [])
-          .map(m => m.name.replace("models/", ""))
-          .filter(m => m.includes("gemini"))
-          .sort();
-        if (models.length > 0) return models;
+        const json = await res.json() as { models?: any[] };
+        const data = (json.models ?? []).filter((m: any) => m.name?.includes("gemini"));
+        if (data.length > 0) {
+          return {
+            api: "google-generative-ai",
+            models: data.map((m: any) => ({
+              id: m.name.replace("models/", ""),
+              reasoning: m.name.includes("thinking") || m.name.includes("2.5"),
+              input: ["text", "image"] as ("text" | "image")[],
+              contextWindow: m.inputTokenLimit ?? 1048576,
+              maxTokens: m.outputTokenLimit ?? 65536,
+            })).sort((a: DiscoveredModel, b: DiscoveredModel) => a.id.localeCompare(b.id)),
+          };
+        }
       }
     } catch { /* fall through */ }
   }
 
-  // Try OpenAI-compatible: GET /v1/models with Bearer auth
+  // Try OpenAI-compatible
   try {
     const res = await fetch(`${base}/v1/models`, {
       headers: { Authorization: `Bearer ${resolvedKey}` },
       signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
-      const json = await res.json() as { data?: { id: string }[] };
-      const models = (json.data ?? []).map(m => m.id).sort();
-      if (models.length > 0) return models;
+      const json = await res.json() as { data?: any[] };
+      const data = json.data ?? [];
+      if (data.length > 0) {
+        return {
+          api: "openai-completions",
+          models: data.map((m: any) => ({
+            id: m.id,
+            reasoning: m.thinking_enabled ?? m.id.includes("o3") ?? false,
+            input: ["text", "image"] as ("text" | "image")[],
+            contextWindow: m.context_window ?? m.max_tokens ?? 128000,
+            maxTokens: m.max_output ?? 16384,
+          })).sort((a: DiscoveredModel, b: DiscoveredModel) => a.id.localeCompare(b.id)),
+        };
+      }
     }
   } catch { /* fall through */ }
 
-  return [];
+  return { models: [] };
 }
 
 export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
@@ -135,11 +168,11 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
       apiKey = await promptKey(info.label);
     }
 
-    // Dynamic model fetch — always try, fall back to static list
+    // Dynamic model fetch — always try
     const fetchUrl = baseUrl || PROVIDER_API_URLS[name];
-    const defaultModel = await selectModel(name, info.label, info.models, fetchUrl, apiKey);
+    const { defaultModel, discoveredModels, api } = await selectModelWithMeta(name, info.label, info.models, fetchUrl, apiKey);
 
-    configs.push({ name, apiKey, defaultModel, baseUrl });
+    configs.push({ name, apiKey, defaultModel, baseUrl, api, discoveredModels });
     p.log.success(t("provider.configured", { label: info.label }));
   }
 
@@ -169,45 +202,54 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
     apiKey = await promptKey(name);
   }
 
-  // Dynamic model fetch
-  const defaultModel = await selectModel(name, name, [], baseUrl, apiKey);
+  const { defaultModel, discoveredModels, api } = await selectModelWithMeta(name, name, [], baseUrl, apiKey);
 
   p.log.success(t("provider.customConfigured", { name, url: baseUrl }));
 
-  return { name, apiKey, defaultModel, baseUrl };
+  return { name, apiKey, defaultModel, baseUrl, api, discoveredModels };
 }
 
-async function selectModel(provider: string, label: string, staticModels: string[], baseUrl?: string, apiKey?: string): Promise<string> {
-  let models = staticModels;
+interface SelectResult {
+  defaultModel: string;
+  discoveredModels?: DiscoveredModel[];
+  api?: string;
+}
 
-  // Always try dynamic fetch
+async function selectModelWithMeta(provider: string, label: string, staticModels: string[], baseUrl?: string, apiKey?: string): Promise<SelectResult> {
+  let modelIds = staticModels;
+  let discoveredModels: DiscoveredModel[] | undefined;
+  let api: string | undefined;
+
   if (baseUrl && apiKey) {
     const s = p.spinner();
     s.start(t("provider.fetchingModels", { source: label }));
-    const fetched = await fetchModels(provider, baseUrl, apiKey);
-    s.stop(fetched.length > 0 ? t("provider.foundModels", { count: fetched.length }) : t("provider.defaultModelList"));
-    if (fetched.length > 0) models = fetched;
+    const result = await fetchModels(provider, baseUrl, apiKey);
+    s.stop(result.models.length > 0 ? t("provider.foundModels", { count: result.models.length }) : t("provider.defaultModelList"));
+    if (result.models.length > 0) {
+      discoveredModels = result.models;
+      api = result.api;
+      modelIds = result.models.map(m => m.id);
+    }
   }
 
-  if (models.length === 0) {
-    // No models found — manual input
+  if (modelIds.length === 0) {
     const model = await p.text({
       message: t("provider.modelName", { label }),
       placeholder: t("provider.modelNamePlaceholder"),
       validate: (v) => (!v || v.trim().length === 0) ? t("provider.modelNameRequired") : undefined,
     });
     if (p.isCancel(model)) { p.cancel(t("cancelled")); process.exit(0); }
-    return model;
+    return { defaultModel: model, discoveredModels, api };
   }
 
-  if (models.length === 1) return models[0];
+  if (modelIds.length === 1) return { defaultModel: modelIds[0], discoveredModels, api };
 
   const model = await p.select({
     message: t("provider.selectModel", { label }),
-    options: models.slice(0, 50).map(m => ({ value: m, label: m })),
+    options: modelIds.slice(0, 50).map(m => ({ value: m, label: m })),
   });
   if (p.isCancel(model)) { p.cancel(t("cancelled")); process.exit(0); }
-  return model;
+  return { defaultModel: model, discoveredModels, api };
 }
 
 async function promptKey(label: string): Promise<string> {

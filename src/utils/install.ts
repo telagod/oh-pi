@@ -61,12 +61,14 @@ export function applyConfig(config: OhPConfig) {
   }
 
   // 2. settings.json
-  const primary = config.providers[0];
+  // Issue #4 fix: prefer provider with baseUrl+defaultModel as primary (custom endpoint user intent)
+  const primary = config.providers.find(p => p.baseUrl && p.defaultModel) ?? config.providers[0];
   const providerInfo = primary ? PROVIDERS[primary.name] : undefined;
   const compactThreshold = config.compactThreshold ?? 0.75;
   const primaryModel = primary?.defaultModel ?? providerInfo?.models[0];
+  const primaryDisc = primary?.discoveredModels?.find(m => m.id === primaryModel);
   const primaryCaps = primaryModel ? MODEL_CAPABILITIES[primaryModel] : undefined;
-  const contextWindow = primary?.contextWindow ?? primaryCaps?.contextWindow ?? 128000;
+  const contextWindow = primaryDisc?.contextWindow ?? primary?.contextWindow ?? primaryCaps?.contextWindow ?? 128000;
   const reserveTokens = Math.round(contextWindow * (1 - compactThreshold));
   const settings: Record<string, unknown> = {
     ...(primary ? { defaultProvider: primary.name, defaultModel: primaryModel } : {}),
@@ -79,6 +81,7 @@ export function applyConfig(config: OhPConfig) {
   };
   if (config.providers.length > 1) {
     settings.enabledModels = config.providers.flatMap((p) => {
+      if (p.discoveredModels?.length) return p.discoveredModels.map(m => m.id);
       const info = PROVIDERS[p.name];
       return info ? info.models : [];
     });
@@ -91,20 +94,32 @@ export function applyConfig(config: OhPConfig) {
     const providers: Record<string, unknown> = {};
     for (const cp of customProviders) {
       const isBuiltin = !!PROVIDERS[cp.name];
-      if (isBuiltin) {
-        // Known provider with custom baseUrl — just override endpoint, keep built-in models
+      if (isBuiltin && !cp.discoveredModels?.length) {
+        // Known provider with custom baseUrl, no discovered models — just override endpoint
         const entry: Record<string, unknown> = { baseUrl: cp.baseUrl };
         if (cp.apiKey !== "none") entry.apiKey = cp.apiKey;
         providers[cp.name] = entry;
       } else {
-        // Fully custom provider — need api, models, etc.
-        const caps = cp.defaultModel ? MODEL_CAPABILITIES[cp.defaultModel] : undefined;
+        // Custom provider or builtin with discovered models — write full config
         const entry: Record<string, unknown> = {
           baseUrl: cp.baseUrl,
-          api: "openai-completions",
+          api: cp.api ?? "openai-completions",
         };
         if (cp.apiKey !== "none") entry.apiKey = cp.apiKey;
-        if (cp.defaultModel) {
+
+        if (cp.discoveredModels?.length) {
+          // Write ALL discovered models with their metadata
+          entry.models = cp.discoveredModels.map(m => ({
+            id: m.id,
+            name: m.id,
+            reasoning: m.reasoning,
+            input: m.input,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: m.contextWindow,
+            maxTokens: m.maxTokens,
+          }));
+        } else if (cp.defaultModel) {
+          const caps = MODEL_CAPABILITIES[cp.defaultModel];
           entry.models = [{
             id: cp.defaultModel,
             name: cp.defaultModel,
