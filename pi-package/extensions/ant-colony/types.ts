@@ -42,11 +42,29 @@ export interface AvailableModel {
   cost?: { input: number };
 }
 
+/** Extract version score from model name: "claude-sonnet-4-0" → 4.0, "claude-3-5-haiku" → 3.5 */
+function modelVersionScore(id: string): number {
+  // Match patterns like "4-0", "3-5", "4.5", "4o" etc.
+  const nums = id.match(/(\d+)[-.](\d+)/g);
+  if (!nums) {
+    const single = id.match(/(\d+)/g);
+    return single ? Math.max(...single.map(Number)) : 0;
+  }
+  // Take the highest version-like number pair
+  return Math.max(...nums.map(n => {
+    const [a, b] = n.split(/[-.]/).map(Number);
+    return a + (b ?? 0) / 10;
+  }));
+}
+
 /**
  * 根据 caste 的 ModelTier 从可用模型中匹配最合适的模型
- * - fast（侦察蚁）：关键词匹配轻量模型，优先同 provider
- * - balanced/powerful（工蚁/兵蚁）：优先用当前会话模型，否则关键词匹配
- * - fallback：按 cost 排序选择
+ *
+ * 策略：从模型名提取版本号排序
+ * - fast（侦察蚁）：选版本号最低的（轻量便宜）
+ * - powerful（工蚁）：选版本号最高的（最强）
+ * - balanced（兵蚁）：优先当前会话模型
+ * - 所有 tier 最终 fallback 到 currentModel
  */
 export function resolveModelForCaste(
   caste: AntCaste,
@@ -59,22 +77,19 @@ export function resolveModelForCaste(
   // 工蚁/兵蚁优先使用当前会话模型
   if (tier !== "fast" && currentModel) return currentModel;
 
-  const keywords = MODEL_TIER_KEYWORDS[tier];
-  // 优先匹配同 provider（从 currentModel 提取 provider 前缀）
-  const provider = currentModel?.split("-")[0];
-  const sameProvider = provider ? available.filter(m => m.id.toLowerCase().startsWith(provider)) : [];
-  const pool = sameProvider.length > 0 ? sameProvider : available;
-  const match = pool.find(m => keywords.some(k => m.id.toLowerCase().includes(k)));
-  if (match) return match.id;
-  // 扩大搜索范围
-  if (sameProvider.length > 0) {
-    const allMatch = available.find(m => keywords.some(k => m.id.toLowerCase().includes(k)));
-    if (allMatch) return allMatch.id;
-  }
-  // Fallback：按 cost 排序
-  const sorted = [...available].sort((a, b) => (a.cost?.input ?? 0) - (b.cost?.input ?? 0));
-  if (tier === "fast") return currentModel ?? sorted[0].id;
-  return currentModel ?? sorted[sorted.length - 1].id;
+  // 按版本号排序
+  const scored = available.map(m => ({ id: m.id, score: modelVersionScore(m.id) }));
+  scored.sort((a, b) => a.score - b.score);
+
+  // 优先同 provider
+  const provider = currentModel?.split("/")[0] ?? currentModel?.split("-")[0];
+  const sameProvider = provider ? scored.filter(m => m.id.toLowerCase().includes(provider.toLowerCase())) : [];
+  const pool = sameProvider.length > 0 ? sameProvider : scored;
+
+  if (tier === "fast") return pool[0]?.id ?? currentModel;
+  if (tier === "powerful") return pool[pool.length - 1]?.id ?? currentModel;
+  // balanced: middle
+  return pool[Math.floor(pool.length / 2)]?.id ?? currentModel;
 }
 
 // ═══ 任务 (Food Source) ═══
