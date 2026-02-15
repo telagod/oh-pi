@@ -133,11 +133,22 @@ Les vraies colonies de fourmis résolvent des problèmes complexes sans contrôl
 
 En mode interactif, la colonie affiche la progression en direct :
 
-- **Widget** — fourmis actives et leur flux de sortie
-- **Barre de statut** — progression des tâches, nombre actif, coût
+- **Barre de statut** — footer compact avec métriques réelles : tâches terminées, fourmis actives, appels d'outils, tokens de sortie, coût, durée
+- **Ctrl+Shift+A** — panneau de détails en overlay avec liste des tâches, flux des fourmis actives et journal de la colonie
 - **Notification** — résumé à la fin
 
 Utilisez `/colony-stop` pour arrêter une colonie en cours.
+
+### Protocole de signaux
+
+La colonie communique avec la conversation principale via des signaux structurés, empêchant le LLM de vérifier ou deviner l'état :
+
+| Signal | Signification |
+|--------|---------------|
+| `COLONY_SIGNAL:LAUNCHED` | Colonie démarrée — ne pas vérifier |
+| `COLONY_SIGNAL:RUNNING` | Colonie active — injecté à chaque tour |
+| `COLONY_SIGNAL:COMPLETE` | Colonie terminée — consulter le rapport |
+| `COLONY_SIGNAL:FAILED` | Colonie crashée — signaler l'erreur |
 
 ### Contrôle des tours
 
@@ -174,7 +185,7 @@ Le LLM décide quand déployer la colonie. Vous n'avez pas à y penser :
 La colonie trouve automatiquement le parallélisme optimal pour votre machine :
 
 ```
-Démarrage à froid  →  1-2 fourmis (conservateur)
+Démarrage à froid  →  ceil(max/2) fourmis (démarrage rapide)
 Exploration        →  +1 par vague, surveillance du débit
 Débit ↓            →  verrouiller l'optimal, stabiliser
 CPU > 85%          →  réduire immédiatement

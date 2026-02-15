@@ -133,11 +133,22 @@ Real ant colonies solve complex problems without central control. Each ant follo
 
 In interactive mode, the colony shows live progress:
 
-- **Widget** — active ants and their current output stream
-- **Status bar** — task progress, active count, cost
+- **Status bar** — compact footer with real metrics: tasks done, active ants, tool calls, output tokens, cost, elapsed time
+- **Ctrl+Shift+A** — overlay detail panel with task list, active ant streams, and colony log
 - **Notification** — completion summary when done
 
 Use `/colony-stop` to abort a running colony.
+
+### Signal Protocol
+
+The colony communicates with the main conversation via structured signals, preventing the LLM from polling or guessing colony status:
+
+| Signal | Meaning |
+|--------|---------|
+| `COLONY_SIGNAL:LAUNCHED` | Colony started — don't poll |
+| `COLONY_SIGNAL:RUNNING` | Colony active — injected each turn |
+| `COLONY_SIGNAL:COMPLETE` | Colony finished — review report |
+| `COLONY_SIGNAL:FAILED` | Colony crashed — report error |
 
 ### Turn Control
 
@@ -174,7 +185,7 @@ The LLM decides when to deploy the colony. You don't have to think about it:
 The colony automatically finds the optimal parallelism for your machine:
 
 ```
-Cold start     →  1-2 ants (conservative)
+Cold start     →  ceil(max/2) ants (fast ramp-up)
 Exploration    →  +1 each wave, monitoring throughput
 Throughput ↓   →  lock optimal, stabilize
 CPU > 85%      →  reduce immediately
