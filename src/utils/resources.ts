@@ -13,5 +13,6 @@ export const resources = {
   extensionFile: (name: string) => join(RESOURCES, "extensions", `${name}.ts`),
   prompt:    (name: string) => join(RESOURCES, "prompts", `${name}.md`),
   skill:     (name: string) => join(RESOURCES, "skills", name),
+  skillsDir: () => join(RESOURCES, "skills"),
   theme:     (name: string) => join(RESOURCES, "themes", `${name}.json`),
 };

@@ -159,15 +159,17 @@ export function applyConfig(config: OhPConfig) {
     try { copyFileSync(src, join(promptDir, `${p}.md`)); } catch { /* skip */ }
   }
 
-  // 8. Copy skills
+  // 8. Copy skills (auto-discover all from pi-package/skills/)
   const skillDir = join(agentDir, "skills");
   cleanDir(skillDir);
-  for (const s of config.skills) {
-    const srcDir = resources.skill(s);
-    const destDir = join(skillDir, s);
-    ensureDir(destDir);
-    try { copyFileSync(join(srcDir, "SKILL.md"), join(destDir, "SKILL.md")); } catch { /* skip */ }
-  }
+  const skillsSrcDir = resources.skillsDir();
+  try {
+    for (const entry of readdirSync(skillsSrcDir, { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(join(skillsSrcDir, entry.name, "SKILL.md"))) {
+        copyDir(join(skillsSrcDir, entry.name), join(skillDir, entry.name));
+      }
+    }
+  } catch { /* skills dir not found, skip */ }
 
   // 9. Copy themes (only custom ones)
   const themeDir = join(agentDir, "themes");

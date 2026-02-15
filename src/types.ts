@@ -28,8 +28,6 @@ export interface OhPConfig {
   keybindings: string;
   /** 启用的扩展列表 */
   extensions: string[];
-  /** 启用的技能列表 */
-  skills: string[];
   /** 提示词模板列表 */
   prompts: string[];
   /** Agent 配置路径 */

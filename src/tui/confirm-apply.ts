@@ -19,7 +19,6 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
     `${t("confirm.thinking")}   ${chalk.cyan(config.thinking)}`,
     `${t("confirm.compaction")} ${chalk.cyan(t("confirm.compactionValue", { pct: Math.round((config.compactThreshold ?? 0.75) * 100) }))}`,
     `${t("confirm.extensions")} ${chalk.cyan(config.extensions.join(", ") || t("confirm.none"))}`,
-    `${t("confirm.skills")}     ${chalk.cyan(config.skills.join(", ") || t("confirm.none"))}`,
     `${t("confirm.prompts")}    ${chalk.cyan(t("confirm.promptsValue", { count: config.prompts.length }))}`,
     `${t("confirm.agents")}     ${chalk.cyan(config.agents)}`,
   ].join("\n");
@@ -30,7 +29,6 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
   if (env.hasExistingConfig) {
     const diff = [
       `Extensions:  ${chalk.dim(countExisting(env, "extensions"))} ${chalk.yellow("→")} ${chalk.green(config.extensions.length)}`,
-      `Skills:      ${chalk.dim(countExisting(env, "skills"))} ${chalk.yellow("→")} ${chalk.green(config.skills.length)}`,
       `Prompts:     ${chalk.dim(countExisting(env, "prompts"))} ${chalk.yellow("→")} ${chalk.green(config.prompts.length)}`,
     ].join("\n");
     p.note(diff, t("confirm.changes"));
@@ -89,7 +87,7 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
     `${chalk.gray("├── ")}AGENTS.md ${chalk.dim(config.agents)}`,
     ...(config.extensions.length > 0 ? [`${chalk.gray("├── ")}extensions/ ${chalk.dim(`${config.extensions.length} items`)}`] : []),
     ...(config.prompts.length > 0 ? [`${chalk.gray("├── ")}prompts/ ${chalk.dim(`${config.prompts.length} templates`)}`] : []),
-    ...(config.skills.length > 0 ? [`${chalk.gray("├── ")}skills/ ${chalk.dim(`${config.skills.length} skills`)}`] : []),
+    `${chalk.gray("├── ")}skills/ ${chalk.dim("auto-discovered")}`,
     ...(!["dark", "light"].includes(config.theme) ? [`${chalk.gray("└── ")}themes/ ${chalk.dim(config.theme)}`] : []),
   ].join("\n");
 
