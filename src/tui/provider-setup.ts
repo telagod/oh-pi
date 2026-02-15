@@ -67,28 +67,10 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
       apiKey = await promptKey(info.label);
     }
 
-    // Ask for custom base URL (optional)
-    const wantCustomUrl = await p.confirm({
-      message: t("provider.customEndpoint", { label: info.label }),
-      initialValue: false,
-    });
-    if (p.isCancel(wantCustomUrl)) { p.cancel(t("cancelled")); process.exit(0); }
-
-    let baseUrl: string | undefined;
-    if (wantCustomUrl) {
-      const url = await p.text({
-        message: t("provider.baseUrl", { label: info.label }),
-        placeholder: t("provider.baseUrlPlaceholder"),
-        validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : undefined,
-      });
-      if (p.isCancel(url)) { p.cancel(t("cancelled")); process.exit(0); }
-      baseUrl = url;
-    }
-
     // Model selection — try dynamic fetch, fall back to static list
-    const defaultModel = await selectModel(info.label, info.models, baseUrl, apiKey);
+    const defaultModel = await selectModel(info.label, info.models, undefined, apiKey);
 
-    configs.push({ name, apiKey, defaultModel, ...(baseUrl ? { baseUrl } : {}) });
+    configs.push({ name, apiKey, defaultModel });
     p.log.success(t("provider.configured", { label: info.label }));
   }
 
@@ -144,55 +126,7 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
 
   p.log.success(t("provider.customConfigured", { name, url: baseUrl }));
 
-  // Model capabilities (optional)
-  const wantCaps = await p.confirm({
-    message: t("provider.configureCaps"),
-    initialValue: false,
-  });
-  if (p.isCancel(wantCaps)) { p.cancel(t("cancelled")); process.exit(0); }
-
-  let contextWindow: number | undefined;
-  let maxTokens: number | undefined;
-  let reasoning: boolean | undefined;
-  let multimodal: boolean | undefined;
-
-  if (wantCaps) {
-    const ctxInput = await p.text({
-      message: t("provider.contextWindow"),
-      placeholder: "128000",
-      initialValue: "128000",
-      validate: (v) => {
-        const n = Number(v);
-        if (isNaN(n) || n < 1024) return t("provider.contextWindowValidation");
-        return undefined;
-      },
-    });
-    if (p.isCancel(ctxInput)) { p.cancel(t("cancelled")); process.exit(0); }
-    contextWindow = Number(ctxInput);
-
-    const maxTokInput = await p.text({
-      message: t("provider.maxTokens"),
-      placeholder: "8192",
-      initialValue: "8192",
-      validate: (v) => {
-        const n = Number(v);
-        if (isNaN(n) || n < 256) return t("provider.maxTokensValidation");
-        return undefined;
-      },
-    });
-    if (p.isCancel(maxTokInput)) { p.cancel(t("cancelled")); process.exit(0); }
-    maxTokens = Number(maxTokInput);
-
-    const isMultimodal = await p.confirm({ message: t("provider.multimodal"), initialValue: false });
-    if (p.isCancel(isMultimodal)) { p.cancel(t("cancelled")); process.exit(0); }
-    multimodal = isMultimodal;
-
-    const isReasoning = await p.confirm({ message: t("provider.reasoning"), initialValue: false });
-    if (p.isCancel(isReasoning)) { p.cancel(t("cancelled")); process.exit(0); }
-    reasoning = isReasoning;
-  }
-
-  return { name, apiKey, defaultModel, baseUrl, contextWindow, maxTokens, reasoning, multimodal };
+  return { name, apiKey, defaultModel, baseUrl };
 }
 
 async function selectModel(label: string, staticModels: string[], baseUrl?: string, apiKey?: string): Promise<string> {

@@ -58,11 +58,7 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
       s.stop(t("confirm.backedUp", { dir: chalk.dim(backupDir) }));
     }
   } else {
-    const ok = await p.confirm({ message: t("confirm.apply") });
-    if (p.isCancel(ok) || !ok) {
-      p.cancel(t("confirm.noChanges"));
-      return;
-    }
+    // New user — skip confirmation, apply directly
   }
 
   // ═══ Install pi if needed ═══

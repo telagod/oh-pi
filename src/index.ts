@@ -43,10 +43,9 @@ export async function run() {
  */
 async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
   const providers = await setupProviders(env);
-  const theme = await selectTheme();
   return {
     providers,
-    theme,
+    theme: "dark",
     keybindings: "default",
     extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
     skills: ["quick-setup", "debug-helper", "git-workflow"],
