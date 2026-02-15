@@ -216,6 +216,7 @@ export async function spawnAnt(
     status: "working",
     taskId: task.id,
     pid: null,
+    model: antConfig.model,
     usage: { input: 0, output: 0, cost: 0, turns: 0 },
     startedAt: Date.now(),
     finishedAt: null,

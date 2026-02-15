@@ -37,6 +37,7 @@ export interface QueenOptions {
   maxAnts?: number;
   maxCost?: number;
   currentModel: string;
+  modelOverrides?: ModelOverrides;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
 }
@@ -138,6 +139,7 @@ interface WaveOptions {
   cwd: string;
   caste: AntCaste;
   currentModel: string;
+  modelOverrides?: ModelOverrides;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
 }
@@ -147,7 +149,8 @@ interface WaveOptions {
  */
 async function runAntWave(opts: WaveOptions): Promise<"ok"> {
   const { nest, cwd, caste, signal, callbacks, currentModel } = opts;
-  const config = { ...DEFAULT_ANT_CONFIGS[caste], model: currentModel };
+  const casteModel = opts.modelOverrides?.[caste] || currentModel;
+  const config = { ...DEFAULT_ANT_CONFIGS[caste], model: casteModel };
 
   let backoffMs = 0; // 429 退避时间
   let consecutiveRateLimits = 0; // 连续限流计数
@@ -160,7 +163,8 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
 
     const ant: Ant = {
       id: "", caste, status: "idle", taskId: task.id,
-      pid: null, usage: { input: 0, output: 0, cost: 0, turns: 0 },
+      pid: null, model: casteModel,
+      usage: { input: 0, output: 0, cost: 0, turns: 0 },
       startedAt: Date.now(), finishedAt: null,
     };
     callbacks.onAntSpawn(ant, task);
@@ -311,6 +315,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   const waveBase: Omit<WaveOptions, "caste"> = {
     nest, cwd: opts.cwd, signal, callbacks,
     currentModel: opts.currentModel,
+    modelOverrides: opts.modelOverrides,
   };
 
   const cleanup = () => {

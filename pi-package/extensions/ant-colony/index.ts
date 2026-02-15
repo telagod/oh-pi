@@ -110,6 +110,9 @@ For simple single-file tasks, work directly without the colony.`,
       goal: Type.String({ description: "What the colony should accomplish" }),
       maxAnts: Type.Optional(Type.Number({ description: "Max concurrent ants (default: auto-adapt)", minimum: 1, maximum: 8 })),
       maxCost: Type.Optional(Type.Number({ description: "Max cost budget in USD (default: unlimited)", minimum: 0.01 })),
+      scoutModel: Type.Optional(Type.String({ description: "Model for scout ants (default: current session model)" })),
+      workerModel: Type.Optional(Type.String({ description: "Model for worker ants (default: current session model)" })),
+      soldierModel: Type.Optional(Type.String({ description: "Model for soldier ants (default: current session model)" })),
     }),
 
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
@@ -169,12 +172,18 @@ For simple single-file tasks, work directly without the colony.`,
           appendFileSync(gitignorePath, `${content.length && !content.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
         }
 
+        const modelOverrides: Record<string, string> = {};
+        if (params.scoutModel) modelOverrides.scout = params.scoutModel;
+        if (params.workerModel) modelOverrides.worker = params.workerModel;
+        if (params.soldierModel) modelOverrides.soldier = params.soldierModel;
+
         const state = await runColony({
           cwd: ctx.cwd,
           goal: params.goal,
           maxAnts: params.maxAnts,
           maxCost: params.maxCost,
           currentModel,
+          modelOverrides,
           signal: signal ?? undefined,
           callbacks,
         });
@@ -282,11 +291,13 @@ For simple single-file tasks, work directly without the colony.`,
             const taskTitle = task?.title?.slice(0, 55) || "...";
             const dur = a.finishedAt ? formatDuration(a.finishedAt - a.startedAt) : formatDuration(Date.now() - a.startedAt);
             const turns = a.usage.turns > 0 ? `${a.usage.turns}t` : "";
+            const model = a.model ? a.model.split("/").pop()! : "";
 
             container.addChild(new Text(
               theme.fg("muted", `  ${branch} `) + statusDot + " " +
               theme.fg("accent", `@${a.id.slice(0, 20)} `) +
-              theme.fg("dim", `(${a.caste}) ${dur}${turns ? " │ " + turns : ""}`),
+              theme.fg("dim", `(${a.caste}) ${dur}${turns ? " │ " + turns : ""}`) +
+              (model ? " " + theme.fg("muted", model) : ""),
               0, 0,
             ));
             container.addChild(new Text(

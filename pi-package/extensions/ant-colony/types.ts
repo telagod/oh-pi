@@ -73,6 +73,7 @@ export interface Ant {
   status: AntStatus;
   taskId: string | null;
   pid: number | null;
+  model: string;
   usage: { input: number; output: number; cost: number; turns: number };
   startedAt: number;
   finishedAt: number | null;
