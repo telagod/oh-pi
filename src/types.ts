@@ -107,6 +107,7 @@ export const EXTENSIONS = [
   { name: "custom-footer",     label: "📊 Custom Footer — Enhanced status bar with tokens, cost, time, git, cwd", default: true },
   { name: "compact-header",    label: "⚡ Compact Header — Dense startup info replacing verbose output", default: true },
   { name: "ant-colony",        label: "🐜 Ant Colony — Autonomous multi-agent swarm with adaptive concurrency", default: false },
+  { name: "auto-update",       label: "🔄 Auto Update — Check for oh-pi updates on startup and notify", default: true },
 ];
 
 /** 快捷键绑定方案（default / vim / emacs） */

@@ -9,7 +9,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     labelKey: "preset.starter", hintKey: "preset.starterHint",
     config: {
       theme: "dark", keybindings: "default", thinking: "medium",
-      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header"],
+      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
       skills: ["quick-setup", "debug-helper"],
       prompts: ["review", "fix", "explain", "commit"],
       agents: "general-developer",
@@ -19,7 +19,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     labelKey: "preset.pro", hintKey: "preset.proHint",
     config: {
       theme: "catppuccin-mocha", keybindings: "default", thinking: "high",
-      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header"],
+      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
       skills: ["quick-setup", "debug-helper", "git-workflow"],
       prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "document", "pr"],
       agents: "fullstack-developer",
@@ -29,7 +29,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     labelKey: "preset.security", hintKey: "preset.securityHint",
     config: {
       theme: "cyberpunk", keybindings: "default", thinking: "high",
-      extensions: ["safe-guard", "custom-footer", "compact-header"],
+      extensions: ["safe-guard", "custom-footer", "compact-header", "auto-update"],
       skills: ["debug-helper"],
       prompts: ["review", "security", "fix", "explain"],
       agents: "security-researcher",
@@ -39,7 +39,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     labelKey: "preset.dataai", hintKey: "preset.dataaiHint",
     config: {
       theme: "tokyo-night", keybindings: "default", thinking: "medium",
-      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header"],
+      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
       skills: ["quick-setup", "debug-helper"],
       prompts: ["review", "fix", "explain", "optimize", "document", "test"],
       agents: "data-ai-engineer",
@@ -56,7 +56,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     labelKey: "preset.full", hintKey: "preset.fullHint",
     config: {
       theme: "dark", keybindings: "default", thinking: "high",
-      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "ant-colony"],
+      extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "ant-colony", "auto-update"],
       skills: ["quick-setup", "debug-helper", "git-workflow", "ant-colony"],
       prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "security", "document", "pr"],
       agents: "colony-operator",
