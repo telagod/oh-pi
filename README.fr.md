@@ -123,6 +123,29 @@ Arrêt forcé        →  À maxTurns+1 : SIGTERM → SIGKILL si nécessaire
 
 Éclaireuse : 8 tours · Ouvrière : 15 tours · Soldat : 8 tours
 
+### Sélection des modèles
+
+La colonie détecte automatiquement les modèles disponibles et laisse le LLM choisir le meilleur par rôle :
+
+| Rôle | Stratégie | Exemple |
+|------|-----------|---------|
+| Éclaireuse | Rapide & économique — lecture seule | `claude-haiku-4-5`, `gpt-4o-mini` |
+| Ouvrière | Capable — modifie le code | `claude-sonnet-4-0`, `gpt-4o` |
+| Soldat | Même que ouvrière ou légèrement moins cher | `claude-sonnet-4-0` |
+
+Remplacement manuel si nécessaire :
+
+```
+ant_colony({
+  goal: "Migrer vers ESM",
+  scoutModel: "claude-haiku-4-5",
+  workerModel: "claude-sonnet-4-0",
+  soldierModel: "claude-sonnet-4-0"
+})
+```
+
+Omettez les trois pour utiliser le modèle de session actuel pour chaque fourmi.
+
 ### Rapport de coûts
 
 La colonie suit le coût par fourmi et le total, rapporté dans le résumé final. **Le coût n'interrompt jamais l'exécution** — les limites de tours et le contrôle de concurrence gèrent les ressources.

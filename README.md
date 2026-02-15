@@ -123,6 +123,29 @@ Hard kill       →  At maxTurns+1: SIGTERM → SIGKILL if needed
 
 Scout: 8 turns · Worker: 15 turns · Soldier: 8 turns
 
+### Model Selection
+
+The colony auto-detects available models and lets the LLM pick the best fit per role:
+
+| Role | Strategy | Example |
+|------|----------|---------|
+| Scout | Fast & cheap — only reads, no edits | `claude-haiku-4-5`, `gpt-4o-mini` |
+| Worker | Capable — makes code changes | `claude-sonnet-4-0`, `gpt-4o` |
+| Soldier | Same as worker or slightly cheaper | `claude-sonnet-4-0` |
+
+Override manually if needed:
+
+```
+ant_colony({
+  goal: "Migrate to ESM",
+  scoutModel: "claude-haiku-4-5",
+  workerModel: "claude-sonnet-4-0",
+  soldierModel: "claude-sonnet-4-0"
+})
+```
+
+Omit all three to use the current session model for every ant.
+
 ### Cost Reporting
 
 The colony tracks cost per ant and total spend, reported in the final summary. **Cost never interrupts execution** — turn limits and concurrency control handle resource management.
