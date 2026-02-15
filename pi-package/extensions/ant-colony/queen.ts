@@ -160,6 +160,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
   }
 
   let backoffMs = 0; // 429 退避时间
+  let consecutiveRateLimits = 0; // 连续限流计数
   const retriedTasks = new Set<string>(); // 防止重复重试
 
   const runOne = async (): Promise<"done" | "empty" | "rate_limited"> => {
@@ -216,12 +217,23 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
   // 调度循环：持续派蚂蚁直到没有待处理任务
   let lastSampleTime = 0;
   while (!signal?.aborted) {
-    // Budget check
+    // 预算检查：派蚂蚁前预估，基于已完成蚂蚁的平均 cost
     if (maxCost != null) {
-      const currentCost = nest.getState().ants.reduce((s, a) => s + a.usage.cost, 0);
+      const ants = nest.getState().ants;
+      const currentCost = ants.reduce((s, a) => s + a.usage.cost, 0);
       if (currentCost >= maxCost) {
         callbacks.onPhase("working", `Budget exceeded ($${currentCost.toFixed(3)} >= $${maxCost.toFixed(2)}). Stopping.`);
         return "budget_exceeded";
+      }
+      // 预估：如果剩余预算不够一只蚂蚁的平均花费，也停止
+      const doneAnts = ants.filter(a => a.status === "done" && a.usage.cost > 0);
+      if (doneAnts.length > 0) {
+        const avgCost = doneAnts.reduce((s, a) => s + a.usage.cost, 0) / doneAnts.length;
+        const remaining = maxCost - currentCost;
+        if (remaining < avgCost * 0.5) {
+          callbacks.onPhase("working", `Budget nearly exhausted ($${currentCost.toFixed(3)}, avg/ant: $${avgCost.toFixed(3)}). Stopping.`);
+          return "budget_exceeded";
+        }
       }
     }
 
@@ -229,11 +241,10 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
     const pending = state.tasks.filter(t => t.status === "pending" && t.caste === caste);
     if (pending.length === 0) break;
 
-    // 429 退避：等待后恢复
+    // 429 退避：短暂等待后恢复，连续限流才逐步加长
     if (backoffMs > 0) {
-      callbacks.onPhase("working", `Rate limited (429). Backing off ${Math.round(backoffMs / 1000)}s...`);
+      callbacks.onPhase("working", `Rate limited (429). Waiting ${Math.round(backoffMs / 1000)}s...`);
       await new Promise(r => setTimeout(r, backoffMs));
-      backoffMs = 0;
     }
 
     // 解除 blocked 任务（如果锁定文件已释放）
@@ -280,15 +291,15 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
     }
     const results = await Promise.all(promises);
 
-    // 429 处理：任何蚂蚁遇到限流 → 降低并发 + 指数退避
+    // 429 处理：降低并发 + 渐进退避（2s → 5s → 10s，上限 10s）
     if (results.includes("rate_limited")) {
+      consecutiveRateLimits++;
       const cur = nest.getState().concurrency;
-      const reduced = Math.max(cur.min, Math.floor(cur.current / 2));
+      const reduced = Math.max(cur.min, cur.current - 1); // 每次只减 1，不砍半
       nest.updateState({ concurrency: { ...cur, current: reduced } });
-      // 指数退避：15s → 30s → 60s，上限 60s
-      backoffMs = backoffMs === 0 ? 15000 : Math.min(backoffMs * 2, 60000);
+      backoffMs = Math.min(consecutiveRateLimits * 2000, 10000);
     } else {
-      // 成功时逐步恢复退避计数
+      consecutiveRateLimits = 0;
       backoffMs = 0;
     }
   }
