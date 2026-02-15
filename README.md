@@ -74,7 +74,7 @@ Already have a config? oh-pi detects it and offers **backup before overwriting**
 
 ### Providers
 
-Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral
+Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral · [FOXNIO](https://www.foxnio.com) (推荐公益 Claude 供应商)
 
 Auto-detects API keys from environment variables.
 

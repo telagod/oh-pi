@@ -68,7 +68,7 @@ async function customFlow(env: EnvInfo): Promise<OhPConfig> {
   });
   if (p.isCancel(wantAdvanced)) { p.cancel(t("cancelled")); process.exit(0); }
 
-  let compactThreshold = 0.75;
+  let compactThreshold = 0.80;
   if (wantAdvanced) {
     const threshold = await p.text({
       message: t("advanced.compactThreshold"),
