@@ -1,16 +1,32 @@
 /**
- * 蚂蚁 Spawner — 每只蚂蚁是一个独立 pi --mode json 进程
+ * 蚂蚁 Spawner — 每只蚂蚁是一个内嵌 AgentSession (SDK)
  *
- * 蚂蚁的 system prompt 中注入：
- * - 自己的角色和任务
- * - 巢穴中的信息素上下文
- * - 完成后输出结构化结果的指令
+ * 替代旧的 `pi --mode json` 子进程方案：
+ * - 零启动开销（同进程）
+ * - 真实时 token 流（session.subscribe）
+ * - 共享 auth/model registry
  */
 
-import { spawn as nodeSpawn } from "node:child_process";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import type { Ant, AntCaste, AntConfig, Task, Pheromone, DEFAULT_ANT_CONFIGS } from "./types.js";
+import {
+  AuthStorage,
+  createAgentSession,
+  createCodingTools,
+  createReadOnlyTools,
+  createReadTool,
+  createBashTool,
+  createEditTool,
+  createWriteTool,
+  createGrepTool,
+  createFindTool,
+  createLsTool,
+  ModelRegistry,
+  SessionManager,
+  SettingsManager,
+  type ResourceLoader,
+  createExtensionRuntime,
+} from "@mariozechner/pi-coding-agent";
+import { getModel } from "@mariozechner/pi-ai";
+import type { Ant, AntCaste, AntConfig, Task, Pheromone, AntStreamEvent } from "./types.js";
 import type { Nest } from "./nest.js";
 
 let antCounter = 0;
@@ -27,16 +43,15 @@ export function makeTaskId(): string {
   return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-interface AntResult {
+export interface AntResult {
   ant: Ant;
   output: string;
-  messages: any[];
   newTasks: ParsedSubTask[];
   pheromones: Pheromone[];
   rateLimited: boolean;
 }
 
-interface ParsedSubTask {
+export interface ParsedSubTask {
   title: string;
   description: string;
   files: string[];
@@ -130,14 +145,6 @@ function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, 
   return prompt;
 }
 
-function writePromptFile(nestDir: string, antId: string, prompt: string): string {
-  const dir = path.join(nestDir, "prompts");
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `${antId}.md`);
-  fs.writeFileSync(file, prompt, { mode: 0o600 });
-  return file;
-}
-
 /** 从蚂蚁输出中解析子任务声明 */
 function parseSubTasks(output: string): ParsedSubTask[] {
   const tasks: ParsedSubTask[] = [];
@@ -158,8 +165,6 @@ function parseSubTasks(output: string): ParsedSubTask[] {
 function extractPheromones(antId: string, caste: AntCaste, taskId: string, output: string, files: string[]): Pheromone[] {
   const pheromones: Pheromone[] = [];
   const now = Date.now();
-
-  // 提取 ## Discoveries 或 ## Pheromone 段落
   const sections = ["Discoveries", "Pheromone", "Files Changed", "Warnings", "Review"];
   for (const section of sections) {
     const regex = new RegExp(`## ${section}\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
@@ -175,7 +180,7 @@ function extractPheromones(antId: string, caste: AntCaste, taskId: string, outpu
         antId,
         antCaste: caste,
         taskId,
-        content: match[1].trim().slice(0, 2000), // 限制大小
+        content: match[1].trim().slice(0, 2000),
         files,
         strength: 1.0,
         createdAt: now,
@@ -185,21 +190,54 @@ function extractPheromones(antId: string, caste: AntCaste, taskId: string, outpu
   return pheromones;
 }
 
-/** 获取蚂蚁输出的最终文本 */
-function getFinalOutput(messages: any[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role === "assistant") {
-      for (const part of msg.content) {
-        if (part.type === "text") return part.text;
-      }
-    }
+/** 根据 tools 列表创建对应的 tool 实例 */
+function createToolsForCaste(cwd: string, toolNames: string[]) {
+  const toolMap: Record<string, (cwd: string) => any> = {
+    read: createReadTool,
+    bash: createBashTool,
+    edit: createEditTool,
+    write: createWriteTool,
+    grep: createGrepTool,
+    find: createFindTool,
+    ls: createLsTool,
+  };
+  return toolNames.map(name => toolMap[name]?.(cwd)).filter(Boolean);
+}
+
+/** 解析 "provider/model-id" 格式的模型字符串 */
+function resolveModel(modelStr: string, modelRegistry: ModelRegistry) {
+  const slashIdx = modelStr.indexOf("/");
+  if (slashIdx > 0) {
+    const provider = modelStr.slice(0, slashIdx);
+    const id = modelStr.slice(slashIdx + 1);
+    return modelRegistry.find(provider, id) || getModel(provider, id);
   }
-  return "";
+  // 尝试所有 provider
+  for (const provider of ["anthropic", "openai", "google"]) {
+    const m = modelRegistry.find(provider, modelStr) || getModel(provider, modelStr);
+    if (m) return m;
+  }
+  return null;
+}
+
+/** 最小化 ResourceLoader，蚂蚁不需要 extensions/skills */
+function makeMinimalResourceLoader(systemPrompt: string): ResourceLoader {
+  return {
+    getExtensions: () => ({ extensions: [], errors: [], runtime: createExtensionRuntime() }),
+    getSkills: () => ({ skills: [], diagnostics: [] }),
+    getPrompts: () => ({ prompts: [], diagnostics: [] }),
+    getThemes: () => ({ themes: [], diagnostics: [] }),
+    getAgentsFiles: () => ({ agentsFiles: [] }),
+    getSystemPrompt: () => systemPrompt,
+    getAppendSystemPrompt: () => [],
+    getPathMetadata: () => new Map(),
+    extendResources: () => {},
+    reload: async () => {},
+  };
 }
 
 /**
- * 孵化并运行一只蚂蚁
+ * 孵化并运行一只蚂蚁 — SDK 内嵌版
  */
 export async function spawnAnt(
   cwd: string,
@@ -207,6 +245,9 @@ export async function spawnAnt(
   task: Task,
   antConfig: Omit<AntConfig, "systemPrompt">,
   signal?: AbortSignal,
+  onStream?: (event: AntStreamEvent) => void,
+  authStorage?: AuthStorage,
+  modelRegistry?: ModelRegistry,
 ): Promise<AntResult> {
   if (!antConfig.model) throw new Error("No model resolved for ant");
   const antId = makeAntId(antConfig.caste);
@@ -225,131 +266,148 @@ export async function spawnAnt(
   nest.updateAnt(ant);
   nest.updateTaskStatus(task.id, "active");
 
-  // 构建 prompt
+  // 构建 system prompt
   const pheromoneCtx = nest.getPheromoneContext(task.files);
   const castePrompt = CASTE_PROMPTS[antConfig.caste];
-  const fullPrompt = buildPrompt(task, pheromoneCtx, castePrompt, antConfig.maxTurns);
-  const tmpFile = writePromptFile(nest.dir, antId, fullPrompt);
+  const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, antConfig.maxTurns);
 
-  const args = [
-    "--mode", "json",
-    "-p",
-    "--no-session",
-    "--model", antConfig.model,
-    "--tools", antConfig.tools.join(","),
-    "--append-system-prompt", tmpFile,
-    `Execute this task: ${task.title}\n\n${task.description}`,
-  ];
+  // 解析模型
+  const auth = authStorage ?? new AuthStorage();
+  const registry = modelRegistry ?? new ModelRegistry(auth);
+  const model = resolveModel(antConfig.model, registry);
+  if (!model) throw new Error(`Model not found: ${antConfig.model}`);
 
-  const messages: any[] = [];
-  let stderr = "";
+  const tools = createToolsForCaste(cwd, antConfig.tools);
+  const resourceLoader = makeMinimalResourceLoader(systemPrompt);
+
+  const settingsManager = SettingsManager.inMemory({
+    compaction: { enabled: false },
+    retry: { enabled: true, maxRetries: 1 },
+  });
+
+  let accumulatedText = "";
+  let rateLimited = false;
 
   try {
-    const exitCode = await new Promise<number>((resolve) => {
-      const proc = nodeSpawn("pi", args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
-      ant.pid = proc.pid ?? null;
-      nest.updateAnt(ant);
+    const { session } = await createAgentSession({
+      cwd,
+      model,
+      thinkingLevel: "off",
+      authStorage: auth,
+      modelRegistry: registry,
+      resourceLoader,
+      tools,
+      sessionManager: SessionManager.inMemory(),
+      settingsManager,
+    });
 
-      let buffer = "";
-      let turnCount = 0;
+    // 订阅实时事件
+    session.subscribe((event) => {
+      if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+        const delta = event.assistantMessageEvent.delta;
+        accumulatedText += delta;
+        onStream?.({
+          antId,
+          caste: antConfig.caste,
+          taskId: task.id,
+          delta,
+          totalText: accumulatedText,
+        });
+      }
 
-      proc.stdout.on("data", (data) => {
-        buffer += data.toString();
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            if (event.type === "turn_end") {
-              turnCount++;
-              // 实时提取信息素：从当前所有 assistant 消息中提取发现
-              if (antConfig.caste === "scout") {
-                const currentOutput = getFinalOutput(messages);
-                if (currentOutput) {
-                  const livePheromones = extractPheromones(antId, antConfig.caste, task.id, currentOutput, task.files);
-                  for (const p of livePheromones) {
-                    p.id = makePheromoneId(); // 确保唯一 ID
-                    nest.dropPheromone(p);
-                  }
-                }
-              }
-              if (antConfig.maxTurns && turnCount === antConfig.maxTurns) {
-                stderr += `[ant-colony] Warning: ant reached maxTurns (${antConfig.maxTurns}), 1 grace turn remaining\n`;
-              } else if (antConfig.maxTurns && turnCount > antConfig.maxTurns) {
-                proc.kill("SIGTERM");
-                setTimeout(() => { if (!proc.killed) proc.kill("SIGKILL"); }, 3000);
-              }
-            }
-            if (event.type === "message_end" && event.message) {
-              messages.push(event.message);
-              if (event.message.role === "assistant") {
-                ant.usage.turns++;
-                const u = event.message.usage;
-                if (u) {
-                  ant.usage.input += u.input || 0;
-                  ant.usage.output += u.output || 0;
-                  ant.usage.cost += u.cost?.total || 0;
-                }
-              }
-            }
-            if (event.type === "tool_result_end" && event.message) {
-              messages.push(event.message);
-            }
-          } catch { /* skip non-json */ }
+      if (event.type === "turn_end") {
+        ant.usage.turns++;
+        // 实时提取信息素（scout）
+        if (antConfig.caste === "scout" && accumulatedText) {
+          const livePheromones = extractPheromones(antId, antConfig.caste, task.id, accumulatedText, task.files);
+          for (const p of livePheromones) {
+            p.id = makePheromoneId();
+            nest.dropPheromone(p);
+          }
         }
-      });
+      }
 
-      proc.stderr.on("data", (d) => { stderr += d.toString(); });
-      proc.on("close", (code) => {
-        if (buffer.trim()) {
-          try {
-            const event = JSON.parse(buffer);
-            if (event.type === "message_end" && event.message) messages.push(event.message);
-          } catch { /* skip */ }
+      if (event.type === "message_end" && event.message?.role === "assistant") {
+        const u = (event.message as any).usage;
+        if (u) {
+          ant.usage.input += u.input || 0;
+          ant.usage.output += u.output || 0;
+          ant.usage.cost += u.cost?.total || 0;
         }
-        resolve(code ?? 1);
-      });
-      proc.on("error", () => resolve(1));
-
-      if (signal) {
-        const kill = () => {
-          try { fs.unlinkSync(tmpFile); } catch { /* already cleaned */ }
-          proc.kill("SIGTERM");
-          setTimeout(() => { if (!proc.killed) proc.kill("SIGKILL"); }, 3000);
-        };
-        if (signal.aborted) kill();
-        else signal.addEventListener("abort", kill, { once: true });
       }
     });
 
-    const output = getFinalOutput(messages);
-    const success = exitCode === 0;
-    const rateLimited = stderr.includes("429") || stderr.includes("rate limit") || stderr.includes("Rate limit")
-      || output.includes("429") || output.includes("rate_limit");
+    // 执行任务
+    const userPrompt = `Execute this task: ${task.title}\n\n${task.description}`;
 
-    ant.status = success ? "done" : "failed";
-    ant.finishedAt = Date.now();
-    ant.pid = null;
-    nest.updateAnt(ant);
-
-    if (rateLimited) {
-      // 429: 不标记任务为 failed，回退为 pending 以便重试
-      nest.updateTaskStatus(task.id, "pending");
-      ant.status = "failed";
-      nest.updateAnt(ant);
-      return { ant, output, messages, newTasks: [], pheromones: [], rateLimited: true };
+    // 处理 abort signal
+    if (signal) {
+      const onAbort = () => session.abort();
+      if (signal.aborted) {
+        await session.abort();
+      } else {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
     }
 
-    // 无论成功或失败，都尝试解析子任务和信息素（支持部分产出）
-    const newTasks = parseSubTasks(output);
-    const pheromones = extractPheromones(antId, antConfig.caste, task.id, output, task.files);
+    await session.prompt(userPrompt);
+
+    // 获取最终输出
+    const messages = session.messages;
+    let finalOutput = accumulatedText;
+    if (!finalOutput) {
+      // fallback: 从 messages 中提取
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role === "assistant") {
+          for (const part of msg.content) {
+            if ((part as any).type === "text") {
+              finalOutput = (part as any).text;
+              break;
+            }
+          }
+          if (finalOutput) break;
+        }
+      }
+    }
+
+    ant.status = "done";
+    ant.finishedAt = Date.now();
+    nest.updateAnt(ant);
+
+    const newTasks = parseSubTasks(finalOutput);
+    const pheromones = extractPheromones(antId, antConfig.caste, task.id, finalOutput, task.files);
     for (const p of pheromones) nest.dropPheromone(p);
 
-    nest.updateTaskStatus(task.id, success ? "done" : "failed", output, success ? undefined : stderr || output);
+    nest.updateTaskStatus(task.id, "done", finalOutput);
 
-    return { ant, output, messages, newTasks, pheromones, rateLimited: false };
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    session.dispose();
+
+    return { ant, output: finalOutput, newTasks, pheromones, rateLimited: false };
+
+  } catch (e: any) {
+    const errStr = String(e);
+    rateLimited = errStr.includes("429") || errStr.includes("rate limit") || errStr.includes("Rate limit");
+
+    if (rateLimited) {
+      nest.updateTaskStatus(task.id, "pending");
+      ant.status = "failed";
+      ant.finishedAt = Date.now();
+      nest.updateAnt(ant);
+      return { ant, output: accumulatedText, newTasks: [], pheromones: [], rateLimited: true };
+    }
+
+    ant.status = "failed";
+    ant.finishedAt = Date.now();
+    nest.updateAnt(ant);
+
+    // 尝试解析部分产出
+    const newTasks = parseSubTasks(accumulatedText);
+    const pheromones = extractPheromones(antId, antConfig.caste, task.id, accumulatedText, task.files);
+    for (const p of pheromones) nest.dropPheromone(p);
+
+    nest.updateTaskStatus(task.id, "failed", accumulatedText, errStr);
+
+    return { ant, output: accumulatedText, newTasks, pheromones, rateLimited: false };
   }
 }

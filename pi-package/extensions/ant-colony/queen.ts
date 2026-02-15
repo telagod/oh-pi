@@ -16,17 +16,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
   ColonyState, Task, Ant, AntCaste, ColonyMetrics,
-  ConcurrencyConfig, TaskPriority, ModelOverrides,
+  ConcurrencyConfig, TaskPriority, ModelOverrides, AntStreamEvent,
 } from "./types.js";
 import { DEFAULT_ANT_CONFIGS } from "./types.js";
 import { Nest } from "./nest.js";
 import { spawnAnt, makeTaskId } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
+import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
 export interface QueenCallbacks {
   onPhase(phase: ColonyState["status"], detail: string): void;
   onAntSpawn(ant: Ant, task: Task): void;
   onAntDone(ant: Ant, task: Task, output: string): void;
+  onAntStream?(event: AntStreamEvent): void;
   onProgress(metrics: ColonyMetrics): void;
   onComplete(state: ColonyState): void;
 }
@@ -40,6 +42,8 @@ export interface QueenOptions {
   modelOverrides?: ModelOverrides;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
+  authStorage?: AuthStorage;
+  modelRegistry?: ModelRegistry;
 }
 
 function makeColonyId(): string {
@@ -142,6 +146,8 @@ interface WaveOptions {
   modelOverrides?: ModelOverrides;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
+  authStorage?: AuthStorage;
+  modelRegistry?: ModelRegistry;
 }
 
 /**
@@ -170,7 +176,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
     callbacks.onAntSpawn(ant, task);
 
     try {
-      const result = await spawnAnt(cwd, nest, task, config, signal);
+      const result = await spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
       callbacks.onAntDone(result.ant, task, result.output);
 
       if (result.rateLimited) {
@@ -316,6 +322,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     nest, cwd: opts.cwd, signal, callbacks,
     currentModel: opts.currentModel,
     modelOverrides: opts.modelOverrides,
+    authStorage: opts.authStorage,
+    modelRegistry: opts.modelRegistry,
   };
 
   const cleanup = () => {
