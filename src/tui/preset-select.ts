@@ -10,7 +10,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     config: {
       theme: "dark", keybindings: "default", thinking: "medium",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
-      skills: ["quick-setup", "debug-helper"],
+      skills: ["quick-setup", "debug-helper", "context7", "web-search", "web-fetch"],
       prompts: ["review", "fix", "explain", "commit"],
       agents: "general-developer",
     },
@@ -20,7 +20,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     config: {
       theme: "catppuccin-mocha", keybindings: "default", thinking: "high",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
-      skills: ["quick-setup", "debug-helper", "git-workflow"],
+      skills: ["quick-setup", "debug-helper", "git-workflow", "context7", "web-search", "web-fetch", "liquid-glass", "glassmorphism", "claymorphism", "neubrutalism"],
       prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "document", "pr"],
       agents: "fullstack-developer",
     },
@@ -30,7 +30,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     config: {
       theme: "cyberpunk", keybindings: "default", thinking: "high",
       extensions: ["safe-guard", "custom-footer", "compact-header", "auto-update"],
-      skills: ["debug-helper"],
+      skills: ["debug-helper", "context7", "web-search", "web-fetch"],
       prompts: ["review", "security", "fix", "explain"],
       agents: "security-researcher",
     },
@@ -40,7 +40,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     config: {
       theme: "tokyo-night", keybindings: "default", thinking: "medium",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
-      skills: ["quick-setup", "debug-helper"],
+      skills: ["quick-setup", "debug-helper", "context7", "web-search", "web-fetch"],
       prompts: ["review", "fix", "explain", "optimize", "document", "test"],
       agents: "data-ai-engineer",
     },
@@ -57,7 +57,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
     config: {
       theme: "dark", keybindings: "default", thinking: "high",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "ant-colony", "auto-update"],
-      skills: ["quick-setup", "debug-helper", "git-workflow", "ant-colony"],
+      skills: ["quick-setup", "debug-helper", "git-workflow", "ant-colony", "context7", "web-search", "web-fetch", "liquid-glass", "glassmorphism", "claymorphism", "neubrutalism"],
       prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "security", "document", "pr"],
       agents: "colony-operator",
     },
