@@ -45,13 +45,16 @@ Already have a config? oh-pi detects it and offers **backup before overwriting**
 ├── settings.json        Model, theme, thinking level
 ├── keybindings.json     Vim/Emacs shortcuts (optional)
 ├── AGENTS.md            Role-specific AI guidelines
-├── extensions/          4 extensions
+├── extensions/          7 extensions (6 default + ant-colony)
 │   ├── safe-guard       Dangerous command confirmation + path protection
 │   ├── git-guard        Auto stash checkpoints + dirty repo warning
 │   ├── auto-session     Session naming from first message
-│   └── ant-colony/      🐜 Autonomous multi-agent swarm
+│   ├── custom-footer    Enhanced status bar (token/cost/time/git/cwd)
+│   ├── compact-header   Streamlined startup info
+│   ├── auto-update      Check for updates on launch
+│   └── ant-colony/      🐜 Autonomous multi-agent swarm (optional)
 ├── prompts/             10 templates (/review /fix /commit /test ...)
-├── skills/              4 skills (debug, git, setup, colony)
+├── skills/              11 skills (tools + UI design + workflows)
 └── themes/              6 custom themes
 ```
 
@@ -108,6 +111,22 @@ Real ant colonies solve complex problems without central control. Each ant follo
 | More food → more ants | More tasks → higher concurrency (auto-adapted) |
 | Pheromone evaporates | 10-minute half-life — stale info fades |
 
+### Turn Control
+
+Each ant has a strict turn budget to prevent runaway execution:
+
+```
+Prompt hint     →  Ant knows its turn limit, plans accordingly
+Warning         →  At maxTurns: warning logged, 1 grace turn to output results
+Hard kill       →  At maxTurns+1: SIGTERM → SIGKILL if needed
+```
+
+Scout: 8 turns · Worker: 15 turns · Soldier: 8 turns
+
+### Cost Reporting
+
+The colony tracks cost per ant and total spend, reported in the final summary. **Cost never interrupts execution** — turn limits and concurrency control handle resource management.
+
 ### Auto-trigger
 
 The LLM decides when to deploy the colony. You don't have to think about it:
@@ -131,13 +150,61 @@ Cold start     →  1-2 ants (conservative)
 Exploration    →  +1 each wave, monitoring throughput
 Throughput ↓   →  lock optimal, stabilize
 CPU > 85%      →  reduce immediately
-429 rate limit →  halve concurrency + exponential backoff (15s→30s→60s)
+429 rate limit →  -1 concurrency + backoff (2s→5s→10s cap)
 Tasks done     →  scale down to minimum
 ```
 
 ### File Safety
 
 One ant per file. Always. Conflicting tasks are automatically blocked and resume when locks release.
+
+## Skills
+
+oh-pi ships 11 skills in three categories.
+
+### 🔧 Tool Skills
+
+Zero-dependency Node.js scripts — no API keys needed.
+
+| Skill | What it does |
+|-------|-------------|
+| `context7` | Query latest library docs via Context7 API |
+| `web-search` | DuckDuckGo search (free, no key) |
+| `web-fetch` | Extract webpage content as plain text |
+
+```bash
+# Examples
+./skills/context7/search.js "react"
+./skills/web-search/search.js "typescript generics" -n 5
+./skills/web-fetch/fetch.js https://example.com
+```
+
+### 🎨 UI Design System Skills
+
+Complete design specs with CSS tokens, component examples, and design principles. The agent loads these when you ask for a specific visual style.
+
+| Skill | Style | CSS Prefix |
+|-------|-------|-----------|
+| `liquid-glass` | Apple WWDC 2025 translucent glass | `--lg-` |
+| `glassmorphism` | Frosted glass blur + transparency | `--glass-` |
+| `claymorphism` | Soft 3D clay-like surfaces | `--clay-` |
+| `neubrutalism` | Bold borders, offset shadows, high contrast | `--nb-` |
+
+Each includes `references/tokens.css` with ready-to-use CSS custom properties.
+
+```
+You: "Build a dashboard with liquid glass style"
+pi loads liquid-glass skill → applies --lg- tokens, glass effects, specular highlights
+```
+
+### 🔄 Workflow Skills
+
+| Skill | What it does |
+|-------|-------------|
+| `quick-setup` | Detect project type, generate .pi/ config |
+| `debug-helper` | Error analysis, log interpretation, profiling |
+| `git-workflow` | Branching, commits, PRs, conflict resolution |
+| `ant-colony` | Colony management commands and strategies |
 
 ## Themes
 

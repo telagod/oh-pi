@@ -22,9 +22,9 @@ npx oh-pi
 
 ---
 
-## 为什么选择 oh-pi
+## 为什么
 
-pi-coding-agent 开箱即用已经很强大，但手动配置供应商、主题、扩展、技能和提示词模板非常繁琐。oh-pi 提供现代化 TUI，一分钟内搞定一切 —— 还附带**蚁群集群**，将 pi 变成多智能体系统。
+pi-coding-agent 开箱即用很强大，但手动配置提供商、主题、扩展、技能和提示词模板很繁琐。oh-pi 提供现代化 TUI，一分钟内搞定一切 —— 还附带一个**蚁群系统**，把 pi 变成多智能体平台。
 
 ## 快速开始
 
@@ -33,132 +33,199 @@ npx oh-pi    # 配置一切
 pi           # 开始编码
 ```
 
-就这么简单。oh-pi 检测你的环境，引导你完成设置，并为你生成 `~/.pi/agent/` 配置。
+就这样。oh-pi 检测你的环境，引导你完成设置，自动写入 `~/.pi/agent/`。
 
 已有配置？oh-pi 会检测到并提供**覆盖前备份**。
 
-## 你将获得
+## 你会得到
 
 ```
 ~/.pi/agent/
 ├── auth.json            API 密钥（0600 权限）
-├── settings.json        模型、主题、思考级别
+├── settings.json        模型、主题、思维级别
 ├── keybindings.json     Vim/Emacs 快捷键（可选）
 ├── AGENTS.md            角色专属 AI 指南
-├── extensions/          4 个扩展
+├── extensions/          7 个扩展（6 个默认 + 蚁群）
 │   ├── safe-guard       危险命令确认 + 路径保护
 │   ├── git-guard        自动 stash 检查点 + 脏仓库警告
-│   ├── auto-session     根据首条消息自动命名会话
-│   └── ant-colony/      🐜 自主多智能体蚁群
+│   ├── auto-session     从首条消息自动命名会话
+│   ├── custom-footer    增强状态栏（token/成本/时间/git/cwd）
+│   ├── compact-header   精简启动信息
+│   ├── auto-update      启动时检查更新
+│   └── ant-colony/      🐜 自主多智能体蚁群系统（可选）
 ├── prompts/             10 个模板（/review /fix /commit /test ...）
-├── skills/              4 个技能（debug、git、setup、colony）
+├── skills/              11 个技能（工具 + UI 设计 + 工作流）
 └── themes/              6 个自定义主题
 ```
 
-## 设置模式
+## 配置模式
 
-| 模式 | 步骤 | 适用场景 |
-|------|------|----------|
-| 🚀 **快速** | 3 | 选供应商 → 输入密钥 → 完成 |
-| 📦 **预设** | 2 | 选择角色配置 → 输入密钥 |
-| 🎛️ **自定义** | 6 | 自己选择所有选项 |
+| 模式 | 步骤 | 适合 |
+|------|------|------|
+| 🚀 **快速** | 3 | 选提供商 → 输入密钥 → 完成 |
+| 📦 **预设** | 2 | 选角色方案 → 输入密钥 |
+| 🎛️ **自定义** | 6 | 逐项自选 |
 
 ### 预设方案
 
-| | 主题 | 思考级别 | 包含 |
-|---|------|----------|------|
-| 🟢 入门 | oh-pi Dark | 中等 | 安全 + git 基础 |
-| 🔵 专业开发者 | Catppuccin | 高 | 完整工具链 |
-| 🟣 安全研究员 | Cyberpunk | 高 | 审计 + 渗透测试 |
-| 🟠 数据 & AI | Tokyo Night | 中等 | MLOps + 流水线 |
-| 🔴 极简 | Default | 关闭 | 仅核心功能 |
-| ⚫ 全功率 | oh-pi Dark | 高 | 所有功能 + 蚁群 |
+| | 主题 | 思维 | 包含 |
+|---|------|------|------|
+| 🟢 入门 | oh-pi Dark | medium | 安全 + git 基础 |
+| 🔵 专业开发 | Catppuccin | high | 全工具链 |
+| 🟣 安全研究 | Cyberpunk | high | 审计 + 渗透测试 |
+| 🟠 数据 & AI | Tokyo Night | medium | MLOps + 管道 |
+| 🔴 极简 | Default | off | 仅核心 |
+| ⚫ 全功率 | oh-pi Dark | high | 全部 + 蚁群 |
 
-### 供应商
+### 提供商
 
-Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral · [FOXNIO](https://www.foxnio.com)（推荐公益 Claude 供应商）
+Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral · [FOXNIO](https://www.foxnio.com)（推荐的公益 Claude 提供商）
 
 自动从环境变量检测 API 密钥。
 
 ## 🐜 蚁群系统
 
-核心特性。模拟真实蚂蚁生态的多智能体集群。
+核心功能。模拟真实蚁群生态的多智能体系统。
 
 ```
-你："把认证从 session 重构为 JWT"
+你: "把认证从 session 重构为 JWT"
 
 oh-pi:
   🔍 侦察蚁探索代码库（haiku — 快速、低成本）
   📋 根据发现生成任务池
   ⚒️  工蚁并行执行任务（sonnet — 能力强）
-  🛡️ 兵蚁审查所有变更（sonnet — 细致）
-  ✅ 完成 — 汇总报告及指标
+  🛡️ 兵蚁审查所有变更（sonnet — 严谨）
+  ✅ 完成 — 汇总报告 + 指标
 ```
 
-### 为什么是蚂蚁？
+### 为什么是蚁群？
 
-真实蚁群无需中央控制即可解决复杂问题。每只蚂蚁遵循简单规则，通过**信息素轨迹**通信，蚁群自组织运作。oh-pi 直接映射了这一模型：
+真实蚁群无需中央控制就能解决复杂问题。每只蚂蚁遵循简单规则，通过**信息素**通信，群体自组织。oh-pi 直接映射：
 
-| 真实蚂蚁 | oh-pi |
+| 真实蚁群 | oh-pi |
 |----------|-------|
 | 侦察蚁发现食物 | 侦察蚁扫描代码库，识别目标 |
-| 信息素轨迹 | `.ant-colony/pheromone.jsonl` — 共享发现 |
+| 信息素路径 | `.ant-colony/pheromone.jsonl` — 共享发现 |
 | 工蚁搬运食物 | 工蚁在分配的文件上执行任务 |
 | 兵蚁守卫巢穴 | 兵蚁审查变更，请求修复 |
-| 食物越多 → 蚂蚁越多 | 任务越多 → 并发越高（自动适配） |
+| 食物越多蚂蚁越多 | 任务越多并发越高（自适应） |
 | 信息素蒸发 | 10 分钟半衰期 — 过时信息自动淡化 |
+
+### 轮次控制
+
+每只蚂蚁有严格的轮次预算，防止失控执行：
+
+```
+提示词提醒   →  蚂蚁知道自己的轮次限制，提前规划
+警告         →  达到 maxTurns：记录警告，给 1 轮宽限期输出结果
+强制终止     →  超过 maxTurns+1：SIGTERM → 必要时 SIGKILL
+```
+
+侦察蚁：8 轮 · 工蚁：15 轮 · 兵蚁：8 轮
+
+### 成本报告
+
+蚁群追踪每只蚂蚁和总花费，在最终报告中汇总。**成本不会中断执行** —— 轮次限制和并发控制负责资源管理。
 
 ### 自动触发
 
-LLM 自行决定何时部署蚁群，你无需操心：
+LLM 自行决定何时部署蚁群，你不需要操心：
 
 - **≥3 个文件**需要修改 → 蚁群
-- 可**并行工作流** → 蚁群
+- **可并行工作流** → 蚁群
 - **单文件**修改 → 直接执行（无蚁群开销）
 
 或手动触发：
 
 ```
-/colony 将整个项目从 CJS 迁移到 ESM
+/colony 把整个项目从 CJS 迁移到 ESM
 ```
 
 ### 自适应并发
 
-蚁群自动为你的机器找到最优并行度：
+蚁群自动找到你机器的最优并行度：
 
 ```
 冷启动       →  1-2 只蚂蚁（保守）
 探索阶段     →  每波 +1，监控吞吐量
 吞吐量下降   →  锁定最优值，稳定运行
-CPU > 85%   →  立即减少
-429 限流     →  并发减半 + 指数退避（15s→30s→60s）
-任务完成     →  缩减至最小值
+CPU > 85%   →  立即降低
+429 限流     →  并发 -1 + 退避（2s→5s→10s 上限）
+任务完成     →  缩减到最小值
 ```
 
 ### 文件安全
 
-一个文件一只蚂蚁，始终如此。冲突任务自动阻塞，锁释放后恢复执行。
+一个文件只有一只蚂蚁。始终如此。冲突任务自动阻塞，锁释放后恢复。
+
+## 技能
+
+oh-pi 附带 11 个技能，分三类。
+
+### 🔧 工具技能
+
+零依赖 Node.js 脚本 —— 无需 API 密钥。
+
+| 技能 | 功能 |
+|------|------|
+| `context7` | 通过 Context7 API 查询最新库文档 |
+| `web-search` | DuckDuckGo 搜索（免费，无需密钥） |
+| `web-fetch` | 提取网页内容为纯文本 |
+
+```bash
+# 示例
+./skills/context7/search.js "react"
+./skills/web-search/search.js "typescript generics" -n 5
+./skills/web-fetch/fetch.js https://example.com
+```
+
+### 🎨 UI 设计规范技能
+
+完整的设计规范，包含 CSS tokens、组件示例和设计原则。当你要求特定视觉风格时，agent 自动加载。
+
+| 技能 | 风格 | CSS 前缀 |
+|------|------|----------|
+| `liquid-glass` | Apple WWDC 2025 半透明玻璃 | `--lg-` |
+| `glassmorphism` | 毛玻璃模糊 + 透明 | `--glass-` |
+| `claymorphism` | 柔和 3D 粘土质感 | `--clay-` |
+| `neubrutalism` | 粗边框、偏移阴影、高对比 | `--nb-` |
+
+每个都包含 `references/tokens.css`，可直接使用的 CSS 自定义属性。
+
+```
+你: "用液态玻璃风格做一个仪表盘"
+pi 加载 liquid-glass 技能 → 应用 --lg- tokens、玻璃效果、高光动画
+```
+
+### 🔄 工作流技能
+
+| 技能 | 功能 |
+|------|------|
+| `quick-setup` | 检测项目类型，生成 .pi/ 配置 |
+| `debug-helper` | 错误分析、日志解读、性能分析 |
+| `git-workflow` | 分支、提交、PR、冲突解决 |
+| `ant-colony` | 蚁群管理命令和策略 |
 
 ## 主题
 
 | | |
 |---|---|
-| 🌙 **oh-pi Dark** | 青色 + 紫色，高对比度 |
+| 🌙 **oh-pi Dark** | 青色 + 紫色，高对比 |
 | 🌙 **Cyberpunk** | 霓虹洋红 + 电光青 |
 | 🌙 **Nord** | 北极蓝色调 |
 | 🌙 **Catppuccin Mocha** | 暗底柔和色 |
-| 🌙 **Tokyo Night** | 蓝紫暮光 |
-| 🌙 **Gruvbox Dark** | 暖色复古风 |
+| 🌙 **Tokyo Night** | 蓝紫暮色 |
+| 🌙 **Gruvbox Dark** | 暖色复古 |
 
 ## 提示词模板
 
 ```
 /review    代码审查：bug、安全、性能
 /fix       最小改动修复错误
-/explain   代码解释，由浅入深
+/explain   代码解释，从简到详
 /refactor  保持行为的重构
 /test      生成测试
-/commit    Conventional Commit 提交信息
+/commit    Conventional Commit 消息
 /pr        Pull Request 描述
 /security  OWASP 安全审计
 /optimize  性能优化
@@ -167,12 +234,12 @@ CPU > 85%   →  立即减少
 
 ## AGENTS.md 模板
 
-| 模板 | 侧重 |
+| 模板 | 方向 |
 |------|------|
 | 通用开发者 | 通用编码指南 |
 | 全栈开发者 | 前端 + 后端 + 数据库 |
 | 安全研究员 | 渗透测试 & 审计 |
-| 数据 & AI 工程师 | MLOps & 流水线 |
+| 数据 & AI 工程师 | MLOps & 管道 |
 | 🐜 蚁群操作员 | 多智能体编排 |
 
 ## 也是 Pi 包
@@ -185,7 +252,7 @@ pi install npm:oh-pi
 
 将所有主题、提示词、技能和扩展添加到你现有的 pi 配置中。
 
-## 环境要求
+## 要求
 
 - Node.js ≥ 20
 - 至少一个 LLM API 密钥

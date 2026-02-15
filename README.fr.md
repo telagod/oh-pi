@@ -24,7 +24,7 @@ npx oh-pi
 
 ## Pourquoi
 
-pi-coding-agent est puissant dès l'installation. Mais configurer manuellement les fournisseurs, thèmes, extensions, compétences et modèles de prompts est fastidieux. oh-pi vous offre une TUI moderne qui fait tout en moins d'une minute — et intègre un **essaim de fourmis** qui transforme pi en système multi-agents.
+pi-coding-agent est puissant dès l'installation. Mais configurer manuellement les fournisseurs, thèmes, extensions, compétences et modèles de prompts est fastidieux. oh-pi offre une TUI moderne qui fait tout en moins d'une minute — et embarque un **essaim de fourmis** qui transforme pi en système multi-agents.
 
 ## Démarrage rapide
 
@@ -33,7 +33,7 @@ npx oh-pi    # tout configurer
 pi           # commencer à coder
 ```
 
-C'est tout. oh-pi détecte votre environnement, vous guide dans la configuration et génère `~/.pi/agent/` pour vous.
+C'est tout. oh-pi détecte votre environnement, vous guide dans la configuration et écrit `~/.pi/agent/` pour vous.
 
 Vous avez déjà une config ? oh-pi la détecte et propose une **sauvegarde avant écrasement**.
 
@@ -45,13 +45,16 @@ Vous avez déjà une config ? oh-pi la détecte et propose une **sauvegarde avan
 ├── settings.json        Modèle, thème, niveau de réflexion
 ├── keybindings.json     Raccourcis Vim/Emacs (optionnel)
 ├── AGENTS.md            Directives IA par rôle
-├── extensions/          4 extensions
+├── extensions/          7 extensions (6 par défaut + colonie)
 │   ├── safe-guard       Confirmation des commandes dangereuses + protection des chemins
-│   ├── git-guard        Checkpoints auto stash + alerte dépôt modifié
+│   ├── git-guard        Points de contrôle stash auto + alerte dépôt sale
 │   ├── auto-session     Nommage de session depuis le premier message
-│   └── ant-colony/      🐜 Essaim multi-agents autonome
+│   ├── custom-footer    Barre d'état améliorée (token/coût/temps/git/cwd)
+│   ├── compact-header   Informations de démarrage simplifiées
+│   ├── auto-update      Vérification des mises à jour au lancement
+│   └── ant-colony/      🐜 Essaim multi-agents autonome (optionnel)
 ├── prompts/             10 modèles (/review /fix /commit /test ...)
-├── skills/              4 compétences (debug, git, setup, colony)
+├── skills/              11 compétences (outils + design UI + workflows)
 └── themes/              6 thèmes personnalisés
 ```
 
@@ -59,20 +62,20 @@ Vous avez déjà une config ? oh-pi la détecte et propose une **sauvegarde avan
 
 | Mode | Étapes | Pour |
 |------|--------|------|
-| 🚀 **Rapide** | 3 | Choisir fournisseur → entrer la clé → terminé |
-| 📦 **Préréglage** | 2 | Choisir un profil de rôle → entrer la clé |
+| 🚀 **Rapide** | 3 | Choisir fournisseur → entrer clé → terminé |
+| 📦 **Préréglage** | 2 | Choisir un profil de rôle → entrer clé |
 | 🎛️ **Personnalisé** | 6 | Tout choisir soi-même |
 
 ### Préréglages
 
 | | Thème | Réflexion | Inclut |
 |---|-------|-----------|--------|
-| 🟢 Débutant | oh-pi Dark | moyen | Sécurité + bases git |
-| 🔵 Développeur Pro | Catppuccin | élevé | Chaîne d'outils complète |
-| 🟣 Chercheur en sécurité | Cyberpunk | élevé | Audit + pentesting |
-| 🟠 Data & IA | Tokyo Night | moyen | MLOps + pipelines |
-| 🔴 Minimal | Default | désactivé | Noyau uniquement |
-| ⚫ Pleine puissance | oh-pi Dark | élevé | Tout + colonie de fourmis |
+| 🟢 Débutant | oh-pi Dark | medium | Sécurité + bases git |
+| 🔵 Pro | Catppuccin | high | Chaîne d'outils complète |
+| 🟣 Chercheur en sécurité | Cyberpunk | high | Audit + pentest |
+| 🟠 Data & IA | Tokyo Night | medium | MLOps + pipelines |
+| 🔴 Minimal | Default | off | Noyau uniquement |
+| ⚫ Pleine puissance | oh-pi Dark | high | Tout + colonie de fourmis |
 
 ### Fournisseurs
 
@@ -82,7 +85,7 @@ Détection automatique des clés API depuis les variables d'environnement.
 
 ## 🐜 Colonie de fourmis
 
-La fonctionnalité phare. Un essaim multi-agents inspiré de l'écologie réelle des fourmis.
+La fonctionnalité phare. Un essaim multi-agents modelé sur l'écologie réelle des fourmis.
 
 ```
 Vous : "Refactorer l'auth des sessions vers JWT"
@@ -91,7 +94,7 @@ oh-pi :
   🔍 Fourmis éclaireuses explorent le code (haiku — rapide, économique)
   📋 Pool de tâches généré à partir des découvertes
   ⚒️  Fourmis ouvrières exécutent en parallèle (sonnet — capable)
-  🛡️ Fourmis soldats révisent tous les changements (sonnet — minutieux)
+  🛡️ Fourmis soldats révisent tous les changements (sonnet — rigoureux)
   ✅ Terminé — rapport de synthèse avec métriques
 ```
 
@@ -99,8 +102,8 @@ oh-pi :
 
 Les vraies colonies de fourmis résolvent des problèmes complexes sans contrôle central. Chaque fourmi suit des règles simples, communique par **pistes de phéromones**, et la colonie s'auto-organise. oh-pi reproduit directement ce modèle :
 
-| Vraies fourmis | oh-pi |
-|----------------|-------|
+| Fourmis réelles | oh-pi |
+|-----------------|-------|
 | L'éclaireuse trouve la nourriture | L'éclaireuse scanne le code, identifie les cibles |
 | Piste de phéromones | `.ant-colony/pheromone.jsonl` — découvertes partagées |
 | L'ouvrière transporte la nourriture | L'ouvrière exécute la tâche sur les fichiers assignés |
@@ -108,13 +111,29 @@ Les vraies colonies de fourmis résolvent des problèmes complexes sans contrôl
 | Plus de nourriture → plus de fourmis | Plus de tâches → concurrence plus élevée (auto-adaptée) |
 | Les phéromones s'évaporent | Demi-vie de 10 min — les infos obsolètes s'estompent |
 
+### Contrôle des tours
+
+Chaque fourmi a un budget strict de tours pour éviter les exécutions incontrôlées :
+
+```
+Indication prompt  →  La fourmi connaît sa limite, planifie en conséquence
+Avertissement      →  À maxTurns : avertissement, 1 tour de grâce pour les résultats
+Arrêt forcé        →  À maxTurns+1 : SIGTERM → SIGKILL si nécessaire
+```
+
+Éclaireuse : 8 tours · Ouvrière : 15 tours · Soldat : 8 tours
+
+### Rapport de coûts
+
+La colonie suit le coût par fourmi et le total, rapporté dans le résumé final. **Le coût n'interrompt jamais l'exécution** — les limites de tours et le contrôle de concurrence gèrent les ressources.
+
 ### Déclenchement automatique
 
 Le LLM décide quand déployer la colonie. Vous n'avez pas à y penser :
 
 - **≥3 fichiers** à modifier → colonie
-- **Flux de travail parallèles** possibles → colonie
-- **Un seul fichier** à modifier → exécution directe (pas de surcharge colonie)
+- **Flux parallèles** possibles → colonie
+- **Un seul fichier** → exécution directe (pas de surcharge colonie)
 
 Ou déclencher manuellement :
 
@@ -129,15 +148,63 @@ La colonie trouve automatiquement le parallélisme optimal pour votre machine :
 ```
 Démarrage à froid  →  1-2 fourmis (conservateur)
 Exploration        →  +1 par vague, surveillance du débit
-Débit en baisse    →  verrouiller l'optimal, stabiliser
+Débit ↓            →  verrouiller l'optimal, stabiliser
 CPU > 85%          →  réduire immédiatement
-429 rate limit     →  diviser la concurrence par 2 + backoff exponentiel (15s→30s→60s)
+429 rate limit     →  concurrence -1 + backoff (2s→5s→10s max)
 Tâches terminées   →  réduire au minimum
 ```
 
 ### Sécurité des fichiers
 
-Une fourmi par fichier. Toujours. Les tâches en conflit sont automatiquement bloquées et reprennent à la libération des verrous.
+Une fourmi par fichier. Toujours. Les tâches en conflit sont automatiquement bloquées et reprennent quand les verrous sont libérés.
+
+## Compétences
+
+oh-pi embarque 11 compétences en trois catégories.
+
+### 🔧 Compétences outils
+
+Scripts Node.js sans dépendances — aucune clé API requise.
+
+| Compétence | Fonction |
+|------------|----------|
+| `context7` | Interroger la doc à jour des bibliothèques via Context7 API |
+| `web-search` | Recherche DuckDuckGo (gratuit, sans clé) |
+| `web-fetch` | Extraire le contenu d'une page web en texte brut |
+
+```bash
+# Exemples
+./skills/context7/search.js "react"
+./skills/web-search/search.js "typescript generics" -n 5
+./skills/web-fetch/fetch.js https://example.com
+```
+
+### 🎨 Compétences design UI
+
+Spécifications complètes avec tokens CSS, exemples de composants et principes de design. L'agent les charge quand vous demandez un style visuel spécifique.
+
+| Compétence | Style | Préfixe CSS |
+|------------|-------|-------------|
+| `liquid-glass` | Verre translucide Apple WWDC 2025 | `--lg-` |
+| `glassmorphism` | Flou givré + transparence | `--glass-` |
+| `claymorphism` | Surfaces 3D douces en argile | `--clay-` |
+| `neubrutalism` | Bordures épaisses, ombres décalées, contraste élevé | `--nb-` |
+
+Chacune inclut `references/tokens.css` avec des propriétés CSS personnalisées prêtes à l'emploi.
+
+```
+Vous : "Construire un tableau de bord style liquid glass"
+pi charge la compétence liquid-glass → applique les tokens --lg-, effets de verre, reflets
+```
+
+### 🔄 Compétences workflow
+
+| Compétence | Fonction |
+|------------|----------|
+| `quick-setup` | Détecter le type de projet, générer la config .pi/ |
+| `debug-helper` | Analyse d'erreurs, interprétation de logs, profilage |
+| `git-workflow` | Branches, commits, PRs, résolution de conflits |
+| `ant-colony` | Commandes et stratégies de gestion de colonie |
 
 ## Thèmes
 
@@ -148,13 +215,13 @@ Une fourmi par fichier. Toujours. Les tâches en conflit sont automatiquement bl
 | 🌙 **Nord** | Palette bleu arctique |
 | 🌙 **Catppuccin Mocha** | Pastel sur fond sombre |
 | 🌙 **Tokyo Night** | Crépuscule bleu + violet |
-| 🌙 **Gruvbox Dark** | Tons rétro chaleureux |
+| 🌙 **Gruvbox Dark** | Tons chauds rétro |
 
 ## Modèles de prompts
 
 ```
 /review    Revue de code : bugs, sécurité, performance
-/fix       Corriger les erreurs avec un minimum de changements
+/fix       Corriger les erreurs avec des changements minimaux
 /explain   Expliquer le code, du simple au détaillé
 /refactor  Refactorer en préservant le comportement
 /test      Générer des tests
@@ -170,12 +237,12 @@ Une fourmi par fichier. Toujours. Les tâches en conflit sont automatiquement bl
 | Modèle | Focus |
 |--------|-------|
 | Développeur généraliste | Directives de codage universelles |
-| Développeur Full-Stack | Frontend + backend + BDD |
-| Chercheur en sécurité | Pentesting & audit |
+| Développeur full-stack | Frontend + backend + BDD |
+| Chercheur en sécurité | Pentest & audit |
 | Ingénieur Data & IA | MLOps & pipelines |
 | 🐜 Opérateur de colonie | Orchestration multi-agents |
 
-## Aussi un package Pi
+## Aussi un paquet Pi
 
 Passez le configurateur, installez directement les ressources :
 

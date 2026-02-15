@@ -14,7 +14,7 @@ export interface AntConfig {
 }
 
 export const DEFAULT_ANT_CONFIGS: Record<AntCaste, Omit<AntConfig, "systemPrompt">> = {
-  scout:   { caste: "scout",   model: "",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 5 },
+  scout:   { caste: "scout",   model: "",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 8 },
   worker:  { caste: "worker",  model: "",  tools: ["read", "bash", "edit", "write", "grep", "find", "ls"], maxTurns: 15 },
   soldier: { caste: "soldier", model: "",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 8 },
 };
