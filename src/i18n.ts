@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts";
+import { execSync } from "node:child_process";
 
 export type Locale = "en" | "zh" | "fr";
 
@@ -472,7 +473,15 @@ export function getLocale(): Locale { return current; }
  * @returns 检测到的语言代码，或 undefined
  */
 function detectLocale(): Locale | undefined {
-  const lang = (process.env.LANG ?? process.env.LC_ALL ?? process.env.LANGUAGE ?? "").toLowerCase();
+  let lang = (process.env.LANG ?? process.env.LC_ALL ?? process.env.LANGUAGE ?? "").toLowerCase();
+
+  // Windows doesn't set LANG/LC_ALL — detect via OS locale
+  if (!lang && process.platform === "win32") {
+    try {
+      lang = execSync("powershell -NoProfile -Command \"(Get-Culture).Name\"", { encoding: "utf8", timeout: 3000 }).trim().toLowerCase();
+    } catch { /* ignore */ }
+  }
+
   if (lang.startsWith("zh")) return "zh";
   if (lang.startsWith("fr")) return "fr";
   if (lang.startsWith("en")) return "en";
