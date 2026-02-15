@@ -1,7 +1,7 @@
 /**
  * Custom Footer Extension — Enhanced status bar
  *
- * Displays: ↑input ↓output Rremaining $cost percent/contextWindow (auto) | ⏱ elapsed | 📂 cwd | 🌿 branch | model • thinking
+ * Displays: in/out/remaining tokens, cost, context%, elapsed, cwd, git branch, model
  * Color-coded context usage: green <50%, yellow 50-75%, red >75%
  */
 
@@ -39,7 +39,6 @@ export default function (pi: ExtensionAPI) {
 				dispose() { unsub(); clearInterval(timer); },
 				invalidate() {},
 				render(width: number): string[] {
-					// --- Tokens & Cost ---
 					let input = 0, output = 0, cost = 0;
 					for (const e of ctx.sessionManager.getBranch()) {
 						if (e.type === "message" && e.message.role === "assistant") {
@@ -50,47 +49,35 @@ export default function (pi: ExtensionAPI) {
 						}
 					}
 
-					// --- Context usage ---
 					const usage = ctx.getContextUsage();
-					const tokens = usage?.tokens ?? 0;
 					const ctxWindow = usage?.contextWindow ?? 0;
 					const pct = usage?.percent ?? 0;
-					const remaining = Math.max(0, ctxWindow - tokens);
+					const remaining = Math.max(0, ctxWindow - (usage?.tokens ?? 0));
 
-					// Color by usage level
 					const pctColor = pct > 75 ? "error" : pct > 50 ? "warning" : "success";
-					const pctStr = `${pct.toFixed(1)}%/${fmt(ctxWindow)}`;
 
 					const tokenStats = [
-						theme.fg("accent", `↑${fmt(input)}`),
-						theme.fg("dim", ` ↓${fmt(output)}`),
-						theme.fg("muted", ` R${fmt(remaining)}`),
-						theme.fg("warning", ` $${cost.toFixed(3)}`),
-						" ",
-						theme.fg(pctColor, pctStr),
-						theme.fg("dim", " (auto)"),
-					].join("");
+						theme.fg("accent", `i${fmt(input)}`),
+						theme.fg("dim", `o${fmt(output)}`),
+						theme.fg("muted", `r${fmt(remaining)}`),
+						theme.fg("warning", `$${cost.toFixed(3)}`),
+						theme.fg(pctColor, `${pct.toFixed(0)}%`),
+					].join(" ");
 
-					// --- Elapsed ---
-					const elapsed = theme.fg("dim", `⏱ ${formatElapsed(Date.now() - sessionStart)}`);
+					const elapsed = theme.fg("dim", formatElapsed(Date.now() - sessionStart));
 
-					// --- CWD (last 2 segments) ---
-					const cwd = process.cwd();
-					const parts = cwd.split("/");
-					const short = parts.length > 2 ? parts.slice(-2).join("/") : cwd;
-					const cwdStr = theme.fg("muted", `📂 ${short}`);
+					const parts = process.cwd().split("/");
+					const short = parts.length > 2 ? parts.slice(-2).join("/") : process.cwd();
+					const cwdStr = theme.fg("muted", short);
 
-					// --- Git branch ---
 					const branch = footerData.getGitBranch();
-					const branchStr = branch ? theme.fg("accent", `🌿 ${branch}`) : "";
+					const branchStr = branch ? theme.fg("accent", branch) : "";
 
-					// --- Right: model + thinking ---
 					const thinking = pi.getThinkingLevel();
 					const modelId = ctx.model?.id || "no-model";
-					const right = theme.fg("dim", `${modelId} • ${thinking}`);
+					const right = theme.fg("dim", `${modelId} ${thinking}`);
 
-					// --- Layout ---
-					const sep = theme.fg("dim", " │ ");
+					const sep = theme.fg("dim", " | ");
 					const leftParts = [tokenStats, elapsed, cwdStr];
 					if (branchStr) leftParts.push(branchStr);
 					const left = leftParts.join(sep);
@@ -99,10 +86,8 @@ export default function (pi: ExtensionAPI) {
 					const rightW = visibleWidth(right);
 					const gap = width - leftW - rightW;
 					if (gap >= 2) {
-						const pad = " ".repeat(gap);
-						return [truncateToWidth(left + pad + right, width)];
+						return [truncateToWidth(left + " ".repeat(gap) + right, width)];
 					}
-					// Not enough space for right side — just show left truncated
 					return [truncateToWidth(left, width)];
 				},
 			};
