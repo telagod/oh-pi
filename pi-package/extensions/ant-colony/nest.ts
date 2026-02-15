@@ -80,7 +80,7 @@ export class Nest {
         .map(f => this.readJson<Task>(path.join(this.tasksDir, f)));
       for (const t of tasks) this.taskCache.set(t.id, t);
       return tasks;
-    } catch { return []; }
+    } catch (e) { console.error("[nest] failed to read tasks dir:", e); return []; }
   }
 
   claimTask(taskId: string, antId: string): boolean {
@@ -217,7 +217,7 @@ export class Nest {
 
   private withStateLock<T>(fn: () => T): T {
     const MAX_WAIT = 5000;
-    const SPIN_MS = 10;
+    const SPIN_MS = 15;
     const start = Date.now();
     while (true) {
       try {
@@ -225,18 +225,22 @@ export class Nest {
         break;
       } catch {
         if (Date.now() - start > MAX_WAIT) {
-          // 超时强制清除死锁
-          try { fs.unlinkSync(this.lockFile); } catch { /* ignore */ }
+          // 超时：检查锁持有者是否存活
+          try {
+            const holder = parseInt(fs.readFileSync(this.lockFile, "utf-8"), 10);
+            try { process.kill(holder, 0); } catch { /* 进程已死，清除死锁 */ fs.unlinkSync(this.lockFile); continue; }
+          } catch { /* 读取失败，强制清除 */ try { fs.unlinkSync(this.lockFile); } catch {} }
           continue;
         }
-        const wait = SPIN_MS + Math.random() * SPIN_MS;
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
+        // 简单 busy-wait，避免 SharedArrayBuffer 依赖
+        const until = Date.now() + SPIN_MS + Math.random() * SPIN_MS;
+        while (Date.now() < until) { /* spin */ }
       }
     }
     try {
       return fn();
     } finally {
-      try { fs.unlinkSync(this.lockFile); } catch { /* ignore */ }
+      try { fs.unlinkSync(this.lockFile); } catch { /* lock already removed */ }
     }
   }
 

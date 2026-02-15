@@ -288,6 +288,7 @@ export async function spawnAnt(
 
       if (signal) {
         const kill = () => {
+          try { fs.unlinkSync(tmpFile); } catch { /* already cleaned */ }
           proc.kill("SIGTERM");
           setTimeout(() => { if (!proc.killed) proc.kill("SIGKILL"); }, 3000);
         };
