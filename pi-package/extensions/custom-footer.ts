@@ -72,22 +72,15 @@ export default function (pi: ExtensionAPI) {
 					const branchStr = branch ? theme.fg("accent", `⎇ ${branch}`) : "";
 
 					const thinking = pi.getThinkingLevel();
+					const thinkColor = thinking === "high" ? "warning" : thinking === "medium" ? "accent" : thinking === "low" ? "dim" : "muted";
 					const modelId = ctx.model?.id || "no-model";
-					const modelStr = theme.fg("accent", `◆ ${modelId}`);
+					const modelStr = theme.fg(thinkColor, "◆") + " " + theme.fg("accent", modelId);
 
 					const sep = theme.fg("dim", " | ");
 					const leftParts = [modelStr, tokenStats, elapsed, cwdStr];
 					if (branchStr) leftParts.push(branchStr);
 					const left = leftParts.join(sep);
 
-					const right = theme.fg("dim", thinking);
-
-					const leftW = visibleWidth(left);
-					const rightW = visibleWidth(right);
-					const gap = width - leftW - rightW;
-					if (gap >= 2) {
-						return [truncateToWidth(left + " ".repeat(gap) + right, width)];
-					}
 					return [truncateToWidth(left, width)];
 				},
 			};
