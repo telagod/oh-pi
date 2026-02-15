@@ -13,8 +13,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text, Container, Spacer } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
-import type { ColonyState, ColonyMetrics, Ant, Task, AvailableModel } from "./types.js";
-import { resolveModelForCaste } from "./types.js";
+import type { ColonyState, ColonyMetrics, Ant, Task } from "./types.js";
 
 interface ColonyDetails {
   state: ColonyState | null;
@@ -49,19 +48,6 @@ function casteIcon(caste: string): string {
   return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : "⚒️";
 }
 
-
-function resolveModels(ctx: { modelRegistry: { getAvailable(): AvailableModel[] }; model?: { id: string } | undefined }): { overrides: Record<string, string>; available: AvailableModel[]; currentModel?: string } {
-  const overrides: Record<string, string> = {};
-  const current = ctx.model?.id;
-  const available = ctx.modelRegistry.getAvailable();
-
-  for (const caste of ["scout", "worker", "soldier"] as const) {
-    const resolved = resolveModelForCaste(caste, available, current);
-    if (resolved) overrides[caste] = resolved;
-  }
-
-  return { overrides, available, currentModel: current };
-}
 
 export default function antColonyExtension(pi: ExtensionAPI) {
 
@@ -102,8 +88,14 @@ For simple single-file tasks, work directly without the colony.`,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const details: ColonyDetails = { state: null, phase: "initializing", log: [] };
 
-      // Resolve models: smart discovery from registry
-      const { overrides: modelOverrides, available, currentModel } = resolveModels(ctx);
+      // 所有蚂蚁统一使用当前会话模型
+      const currentModel = ctx.model?.id;
+      if (!currentModel) {
+        return {
+          content: [{ type: "text", text: "Colony failed: no model available in current session" }],
+          isError: true,
+        };
+      }
 
       const emit = () => {
         const summary = details.state
@@ -155,8 +147,6 @@ For simple single-file tasks, work directly without the colony.`,
           goal: params.goal,
           maxAnts: params.maxAnts,
           maxCost: params.maxCost,
-          modelOverrides,
-          availableModels: available,
           currentModel,
           signal: signal ?? undefined,
           callbacks,

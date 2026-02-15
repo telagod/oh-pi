@@ -19,78 +19,8 @@ export const DEFAULT_ANT_CONFIGS: Record<AntCaste, Omit<AntConfig, "systemPrompt
   soldier: { caste: "soldier", model: "",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 8 },
 };
 
-// ═══ 模型层级 ═══
-export type ModelTier = "fast" | "balanced" | "powerful";
-
-export const CASTE_MODEL_TIER: Record<AntCaste, ModelTier> = {
-  scout: "fast",
-  worker: "powerful",
-  soldier: "balanced",
-};
-
-export const MODEL_TIER_KEYWORDS: Record<ModelTier, string[]> = {
-  fast:     ["haiku", "mini", "flash", "nano", "small"],
-  balanced: ["sonnet", "gpt-4o", "pro"],
-  powerful: ["opus", "o1", "o3", "deepthink"],
-};
-
 /** Per-caste model overrides from user config */
 export type ModelOverrides = Partial<Record<AntCaste, string>>;
-
-export interface AvailableModel {
-  id: string;
-  cost?: { input: number };
-}
-
-/** Extract version score from model name: "claude-sonnet-4-0" → 4.0, "claude-3-5-haiku" → 3.5 */
-function modelVersionScore(id: string): number {
-  // Match patterns like "4-0", "3-5", "4.5", "4o" etc.
-  const nums = id.match(/(\d+)[-.](\d+)/g);
-  if (!nums) {
-    const single = id.match(/(\d+)/g);
-    return single ? Math.max(...single.map(Number)) : 0;
-  }
-  // Take the highest version-like number pair
-  return Math.max(...nums.map(n => {
-    const [a, b] = n.split(/[-.]/).map(Number);
-    return a + (b ?? 0) / 10;
-  }));
-}
-
-/**
- * 根据 caste 的 ModelTier 从可用模型中匹配最合适的模型
- *
- * 策略：从模型名提取版本号排序
- * - fast（侦察蚁）：选版本号最低的（轻量便宜）
- * - powerful（工蚁）：选版本号最高的（最强）
- * - balanced（兵蚁）：优先当前会话模型
- * - 所有 tier 最终 fallback 到 currentModel
- */
-export function resolveModelForCaste(
-  caste: AntCaste,
-  available: AvailableModel[],
-  currentModel?: string,
-): string | undefined {
-  if (available.length === 0) return currentModel;
-  const tier = CASTE_MODEL_TIER[caste];
-
-  // 工蚁/兵蚁优先使用当前会话模型
-  if (tier !== "fast" && currentModel) return currentModel;
-
-  // 按版本号排序
-  const scored = available.map(m => ({ id: m.id, score: modelVersionScore(m.id) }));
-  scored.sort((a, b) => a.score - b.score);
-
-  // 优先同 provider
-  const provider = currentModel?.split("/")[0] ?? currentModel?.split("-")[0];
-  const sameProvider = provider ? scored.filter(m => m.id.toLowerCase().includes(provider.toLowerCase())) : [];
-  const pool = sameProvider.length > 0 ? sameProvider : scored;
-
-  if (tier === "fast") return pool[pool.length - 1]?.id ?? currentModel;
-  if (tier === "powerful") return pool[pool.length - 1]?.id ?? currentModel;
-  // balanced: middle
-  return pool[Math.floor(pool.length / 2)]?.id ?? currentModel;
-}
 
 // ═══ 任务 (Food Source) ═══
 export type TaskStatus = "pending" | "claimed" | "active" | "done" | "failed" | "blocked";

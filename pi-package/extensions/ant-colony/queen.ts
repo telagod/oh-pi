@@ -16,9 +16,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
   ColonyState, Task, Ant, AntCaste, ColonyMetrics,
-  ConcurrencyConfig, TaskPriority, ModelOverrides, AvailableModel,
+  ConcurrencyConfig, TaskPriority, ModelOverrides,
 } from "./types.js";
-import { DEFAULT_ANT_CONFIGS, resolveModelForCaste } from "./types.js";
+import { DEFAULT_ANT_CONFIGS } from "./types.js";
 import { Nest } from "./nest.js";
 import { spawnAnt, makeTaskId } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
@@ -36,9 +36,7 @@ export interface QueenOptions {
   goal: string;
   maxAnts?: number;
   maxCost?: number;
-  modelOverrides?: ModelOverrides;
-  availableModels?: AvailableModel[];
-  currentModel?: string;
+  currentModel: string;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
 }
@@ -139,25 +137,18 @@ interface WaveOptions {
   nest: Nest;
   cwd: string;
   caste: AntCaste;
+  currentModel: string;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
-  modelOverrides?: ModelOverrides;
   maxCost?: number;
-  availableModels?: AvailableModel[];
-  currentModel?: string;
 }
 
 /**
  * 并发执行一批蚂蚁，自适应调节并发度
  */
 async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> {
-  const { nest, cwd, caste, signal, callbacks, modelOverrides, maxCost, availableModels, currentModel } = opts;
-  const config = { ...DEFAULT_ANT_CONFIGS[caste] };
-  if (modelOverrides?.[caste]) {
-    config.model = modelOverrides[caste];
-  } else if (!config.model && availableModels?.length) {
-    config.model = resolveModelForCaste(caste, availableModels, currentModel) ?? "";
-  }
+  const { nest, cwd, caste, signal, callbacks, maxCost, currentModel } = opts;
+  const config = { ...DEFAULT_ANT_CONFIGS[caste], model: currentModel };
 
   let backoffMs = 0; // 429 退避时间
   let consecutiveRateLimits = 0; // 连续限流计数
@@ -327,7 +318,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       startTime: Date.now(), throughputHistory: [],
     },
     maxCost: opts.maxCost ?? null,
-    modelOverrides: opts.modelOverrides ?? {},
+    modelOverrides: {},
     createdAt: Date.now(),
     finishedAt: null,
   };
@@ -340,8 +331,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   const { signal, callbacks } = opts;
   const waveBase: Omit<WaveOptions, "caste"> = {
     nest, cwd: opts.cwd, signal, callbacks,
-    modelOverrides: opts.modelOverrides, maxCost: opts.maxCost,
-    availableModels: opts.availableModels, currentModel: opts.currentModel,
+    maxCost: opts.maxCost, currentModel: opts.currentModel,
   };
 
   const cleanup = () => {
