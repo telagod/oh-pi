@@ -12,6 +12,8 @@ Like oh-my-zsh for pi — but with an autonomous ant colony.
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
 [![node](https://img.shields.io/node/v/oh-pi)](https://nodejs.org)
 
+[English](./README.md) | [中文](./README.zh.md) | [Français](./README.fr.md)
+
 ```bash
 npx oh-pi
 ```
@@ -74,7 +76,7 @@ Already have a config? oh-pi detects it and offers **backup before overwriting**
 
 ### Providers
 
-Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral · [FOXNIO](https://www.foxnio.com) (推荐公益 Claude 供应商)
+Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral · [FOXNIO](https://www.foxnio.com) (recommended public-benefit Claude provider)
 
 Auto-detects API keys from environment variables.
 
