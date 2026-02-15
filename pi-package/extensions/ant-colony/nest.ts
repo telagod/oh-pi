@@ -18,6 +18,9 @@ export class Nest {
   private lockFile: string;
   private pheromoneFile: string;
   private tasksDir: string;
+  private pheromoneCache: Pheromone[] = [];
+  private pheromoneOffset: number = 0;
+  private taskCache: Map<string, Task> = new Map();
 
   constructor(private cwd: string, private colonyId: string) {
     this.dir = path.join(cwd, ".ant-colony", colonyId);
@@ -32,6 +35,7 @@ export class Nest {
 
   init(state: ColonyState): void {
     this.writeJson(this.stateFile, state);
+    this.taskCache.clear();
     for (const t of state.tasks) this.writeTask(t);
   }
 
@@ -55,18 +59,27 @@ export class Nest {
 
   writeTask(task: Task): void {
     this.writeJson(path.join(this.tasksDir, `${task.id}.json`), task);
+    this.taskCache.set(task.id, task);
   }
 
   getTask(id: string): Task | null {
+    const cached = this.taskCache.get(id);
+    if (cached) return cached;
     const f = path.join(this.tasksDir, `${id}.json`);
-    return fs.existsSync(f) ? this.readJson<Task>(f) : null;
+    if (!fs.existsSync(f)) return null;
+    const task = this.readJson<Task>(f);
+    this.taskCache.set(id, task);
+    return task;
   }
 
   getAllTasks(): Task[] {
+    if (this.taskCache.size > 0) return Array.from(this.taskCache.values());
     try {
-      return fs.readdirSync(this.tasksDir)
+      const tasks = fs.readdirSync(this.tasksDir)
         .filter(f => f.endsWith(".json"))
         .map(f => this.readJson<Task>(path.join(this.tasksDir, f)));
+      for (const t of tasks) this.taskCache.set(t.id, t);
+      return tasks;
     } catch { return []; }
   }
 
@@ -131,19 +144,30 @@ export class Nest {
 
   getAllPheromones(): Pheromone[] {
     if (!fs.existsSync(this.pheromoneFile)) return [];
-    const now = Date.now();
     const HALF_LIFE = 10 * 60 * 1000; // 10 分钟半衰期
-    return fs.readFileSync(this.pheromoneFile, "utf-8")
-      .split("\n")
-      .filter(Boolean)
-      .map(line => {
-        const p = JSON.parse(line) as Pheromone;
-        // 信息素挥发：指数衰减
-        const age = now - p.createdAt;
-        p.strength = p.strength * Math.pow(0.5, age / HALF_LIFE);
-        return p;
-      })
-      .filter(p => p.strength > 0.05); // 过弱的丢弃
+    const now = Date.now();
+
+    // 增量读取：只读 offset 之后的新数据
+    const stat = fs.statSync(this.pheromoneFile);
+    if (stat.size > this.pheromoneOffset) {
+      const fd = fs.openSync(this.pheromoneFile, "r");
+      const buf = Buffer.alloc(stat.size - this.pheromoneOffset);
+      fs.readSync(fd, buf, 0, buf.length, this.pheromoneOffset);
+      fs.closeSync(fd);
+      const newLines = buf.toString("utf-8").split("\n").filter(Boolean);
+      for (const line of newLines) {
+        this.pheromoneCache.push(JSON.parse(line) as Pheromone);
+      }
+      this.pheromoneOffset = stat.size;
+    }
+
+    // 衰减 + 过滤弱信息素
+    this.pheromoneCache = this.pheromoneCache.filter(p => {
+      p.strength = p.strength * Math.pow(0.5, (now - p.createdAt) / HALF_LIFE);
+      return p.strength > 0.05;
+    });
+
+    return this.pheromoneCache;
   }
 
   /** 读取与特定文件相关的信息素摘要 */

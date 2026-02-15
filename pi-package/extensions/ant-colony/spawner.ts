@@ -9,7 +9,6 @@
 
 import { spawn as nodeSpawn } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { Ant, AntCaste, AntConfig, Task, Pheromone, DEFAULT_ANT_CONFIGS } from "./types.js";
 import type { Nest } from "./nest.js";
@@ -127,11 +126,12 @@ function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string):
   return prompt;
 }
 
-function writePromptFile(antId: string, prompt: string): { dir: string; file: string } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ant-"));
+function writePromptFile(nestDir: string, antId: string, prompt: string): string {
+  const dir = path.join(nestDir, "prompts");
+  fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${antId}.md`);
   fs.writeFileSync(file, prompt, { mode: 0o600 });
-  return { dir, file };
+  return file;
 }
 
 /** 从蚂蚁输出中解析子任务声明 */
@@ -224,7 +224,7 @@ export async function spawnAnt(
   const pheromoneCtx = nest.getPheromoneContext(task.files);
   const castePrompt = CASTE_PROMPTS[antConfig.caste];
   const fullPrompt = buildPrompt(task, pheromoneCtx, castePrompt);
-  const { dir: tmpDir, file: tmpFile } = writePromptFile(antId, fullPrompt);
+  const tmpFile = writePromptFile(nest.dir, antId, fullPrompt);
 
   const args = [
     "--mode", "json",
@@ -324,6 +324,5 @@ export async function spawnAnt(
     return { ant, output, messages, newTasks, pheromones, rateLimited: false };
   } finally {
     try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-    try { fs.rmdirSync(tmpDir); } catch { /* ignore */ }
   }
 }

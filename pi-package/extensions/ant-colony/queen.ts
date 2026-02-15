@@ -160,6 +160,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
   }
 
   let backoffMs = 0; // 429 退避时间
+  const retriedTasks = new Set<string>(); // 防止重复重试
 
   const runOne = async (): Promise<"done" | "empty" | "rate_limited"> => {
     const task = nest.nextPendingTask(caste);
@@ -202,12 +203,18 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
 
       return "done";
     } catch (e) {
-      nest.updateTaskStatus(task.id, "failed", undefined, String(e));
+      if (!retriedTasks.has(task.id)) {
+        retriedTasks.add(task.id);
+        nest.updateTaskStatus(task.id, "pending");
+      } else {
+        nest.updateTaskStatus(task.id, "failed", undefined, String(e));
+      }
       return "done";
     }
   };
 
   // 调度循环：持续派蚂蚁直到没有待处理任务
+  let lastSampleTime = 0;
   while (!signal?.aborted) {
     // Budget check
     if (maxCost != null) {
@@ -238,16 +245,20 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
       }
     }
 
-    // 自适应并发
-    const completedRecently = state.tasks.filter(t =>
-      t.status === "done" && t.finishedAt && t.finishedAt > Date.now() - 120000
-    ).length;
-    const sample = sampleSystem(
-      state.ants.filter(a => a.status === "working").length,
-      completedRecently,
-      2,
-    );
-    nest.recordSample(sample);
+    // 自适应并发（每 5000ms 采样一次）
+    const now = Date.now();
+    if (now - lastSampleTime >= 5000) {
+      lastSampleTime = now;
+      const completedRecently = state.tasks.filter(t =>
+        t.status === "done" && t.finishedAt && t.finishedAt > now - 120000
+      ).length;
+      const sample = sampleSystem(
+        state.ants.filter(a => a.status === "working").length,
+        completedRecently,
+        2,
+      );
+      nest.recordSample(sample);
+    }
 
     const concurrency = adapt(state.concurrency, pending.length);
     nest.updateState({ concurrency });
