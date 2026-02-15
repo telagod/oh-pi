@@ -85,7 +85,7 @@ Détection automatique des clés API depuis les variables d'environnement.
 
 ## 🐜 Colonie de fourmis
 
-La fonctionnalité phare. Un essaim multi-agents modelé sur l'écologie réelle des fourmis.
+La fonctionnalité phare. Un essaim multi-agents modelé sur l'écologie réelle des fourmis — profondément intégré au SDK pi.
 
 ```
 Vous : "Refactorer l'auth des sessions vers JWT"
@@ -95,8 +95,26 @@ oh-pi :
   📋 Pool de tâches généré à partir des découvertes
   ⚒️  Fourmis ouvrières exécutent en parallèle (sonnet — capable)
   🛡️ Fourmis soldats révisent tous les changements (sonnet — rigoureux)
-  ✅ Terminé — rapport de synthèse avec métriques
+  ✅ Terminé — rapport auto-injecté dans la conversation
 ```
+
+### Architecture
+
+Chaque fourmi est une `AgentSession` in-process (SDK pi), pas un sous-processus :
+
+```
+pi (processus principal)
+  └─ ant_colony tool
+       └─ queen.ts → runColony()
+            └─ spawnAnt() → createAgentSession()
+                 ├─ session.subscribe() → flux de tokens en temps réel
+                 ├─ Zéro surcharge de démarrage (processus partagé)
+                 └─ Auth et registre de modèles partagés
+```
+
+**Mode interactif :** La colonie tourne en arrière-plan — vous continuez à discuter. Un widget en temps réel affiche la progression, et les résultats sont auto-injectés à la fin.
+
+**Mode print (`pi -p`) :** La colonie tourne de manière synchrone, bloque jusqu'à la fin.
 
 ### Pourquoi des fourmis ?
 
@@ -111,15 +129,19 @@ Les vraies colonies de fourmis résolvent des problèmes complexes sans contrôl
 | Plus de nourriture → plus de fourmis | Plus de tâches → concurrence plus élevée (auto-adaptée) |
 | Les phéromones s'évaporent | Demi-vie de 10 min — les infos obsolètes s'estompent |
 
+### UI en temps réel
+
+En mode interactif, la colonie affiche la progression en direct :
+
+- **Widget** — fourmis actives et leur flux de sortie
+- **Barre de statut** — progression des tâches, nombre actif, coût
+- **Notification** — résumé à la fin
+
+Utilisez `/colony-stop` pour arrêter une colonie en cours.
+
 ### Contrôle des tours
 
 Chaque fourmi a un budget strict de tours pour éviter les exécutions incontrôlées :
-
-```
-Indication prompt  →  La fourmi connaît sa limite, planifie en conséquence
-Avertissement      →  À maxTurns : avertissement, 1 tour de grâce pour les résultats
-Arrêt forcé        →  À maxTurns+1 : SIGTERM → SIGKILL si nécessaire
-```
 
 Éclaireuse : 8 tours · Ouvrière : 15 tours · Soldat : 8 tours
 
@@ -133,18 +155,7 @@ La colonie détecte automatiquement les modèles disponibles et laisse le LLM ch
 | Ouvrière | Capable — modifie le code | `claude-sonnet-4-0`, `gpt-4o` |
 | Soldat | Même que ouvrière ou légèrement moins cher | `claude-sonnet-4-0` |
 
-Remplacement manuel si nécessaire :
-
-```
-ant_colony({
-  goal: "Migrer vers ESM",
-  scoutModel: "claude-haiku-4-5",
-  workerModel: "claude-sonnet-4-0",
-  soldierModel: "claude-sonnet-4-0"
-})
-```
-
-Omettez les trois pour utiliser le modèle de session actuel pour chaque fourmi.
+Omettez les modèles pour utiliser le modèle de session actuel pour chaque fourmi.
 
 ### Rapport de coûts
 
@@ -157,12 +168,6 @@ Le LLM décide quand déployer la colonie. Vous n'avez pas à y penser :
 - **≥3 fichiers** à modifier → colonie
 - **Flux parallèles** possibles → colonie
 - **Un seul fichier** → exécution directe (pas de surcharge colonie)
-
-Ou déclencher manuellement :
-
-```
-/colony migrer tout le projet de CJS vers ESM
-```
 
 ### Concurrence adaptative
 

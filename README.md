@@ -85,7 +85,7 @@ Auto-detects API keys from environment variables.
 
 ## 🐜 Ant Colony
 
-The headline feature. A multi-agent swarm modeled after real ant ecology.
+The headline feature. A multi-agent swarm modeled after real ant ecology — deeply integrated into pi's SDK.
 
 ```
 You: "Refactor auth from sessions to JWT"
@@ -95,8 +95,26 @@ oh-pi:
   📋 Task pool generated from discoveries
   ⚒️  Worker ants execute in parallel (sonnet — capable)
   🛡️ Soldier ants review all changes (sonnet — thorough)
-  ✅ Done — summary report with metrics
+  ✅ Done — report auto-injected into conversation
 ```
+
+### Architecture
+
+Each ant is an in-process `AgentSession` (pi SDK), not a child process:
+
+```
+pi (main process)
+  └─ ant_colony tool
+       └─ queen.ts → runColony()
+            └─ spawnAnt() → createAgentSession()
+                 ├─ session.subscribe() → real-time token stream
+                 ├─ Zero startup overhead (shared process)
+                 └─ Shared auth & model registry
+```
+
+**Interactive mode:** Colony runs in the background — you keep chatting. A live widget shows ant progress, and results are auto-injected when done.
+
+**Print mode (`pi -p`):** Colony runs synchronously, blocks until complete.
 
 ### Why ants?
 
@@ -111,15 +129,19 @@ Real ant colonies solve complex problems without central control. Each ant follo
 | More food → more ants | More tasks → higher concurrency (auto-adapted) |
 | Pheromone evaporates | 10-minute half-life — stale info fades |
 
+### Real-time UI
+
+In interactive mode, the colony shows live progress:
+
+- **Widget** — active ants and their current output stream
+- **Status bar** — task progress, active count, cost
+- **Notification** — completion summary when done
+
+Use `/colony-stop` to abort a running colony.
+
 ### Turn Control
 
 Each ant has a strict turn budget to prevent runaway execution:
-
-```
-Prompt hint     →  Ant knows its turn limit, plans accordingly
-Warning         →  At maxTurns: warning logged, 1 grace turn to output results
-Hard kill       →  At maxTurns+1: SIGTERM → SIGKILL if needed
-```
 
 Scout: 8 turns · Worker: 15 turns · Soldier: 8 turns
 
@@ -133,18 +155,7 @@ The colony auto-detects available models and lets the LLM pick the best fit per 
 | Worker | Capable — makes code changes | `claude-sonnet-4-0`, `gpt-4o` |
 | Soldier | Same as worker or slightly cheaper | `claude-sonnet-4-0` |
 
-Override manually if needed:
-
-```
-ant_colony({
-  goal: "Migrate to ESM",
-  scoutModel: "claude-haiku-4-5",
-  workerModel: "claude-sonnet-4-0",
-  soldierModel: "claude-sonnet-4-0"
-})
-```
-
-Omit all three to use the current session model for every ant.
+Omit model overrides to use the current session model for every ant.
 
 ### Cost Reporting
 
@@ -157,12 +168,6 @@ The LLM decides when to deploy the colony. You don't have to think about it:
 - **≥3 files** need changes → colony
 - **Parallel workstreams** possible → colony
 - **Single file** change → direct execution (no colony overhead)
-
-Or trigger manually:
-
-```
-/colony migrate the entire project from CJS to ESM
-```
 
 ### Adaptive Concurrency
 
