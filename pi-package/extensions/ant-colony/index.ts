@@ -11,7 +11,8 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text, Container, Spacer } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
-import type { ColonyState, ColonyMetrics, Ant, Task } from "./types.js";
+import type { ColonyState, ColonyMetrics, Ant, Task, AvailableModel } from "./types.js";
+import { resolveModelForCaste } from "./types.js";
 
 interface ColonyDetails {
   state: ColonyState | null;
@@ -44,6 +45,20 @@ function statusIcon(status: string): string {
 
 function casteIcon(caste: string): string {
   return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : "⚒️";
+}
+
+
+function resolveModels(ctx: { modelRegistry: { getAvailable(): AvailableModel[] }; model?: { id: string } | undefined }): { overrides: Record<string, string>; available: AvailableModel[]; currentModel?: string } {
+  const overrides: Record<string, string> = {};
+  const current = ctx.model?.id;
+  const available = ctx.modelRegistry.getAvailable();
+
+  for (const caste of ["scout", "worker", "soldier"] as const) {
+    const resolved = resolveModelForCaste(caste, available, current);
+    if (resolved) overrides[caste] = resolved;
+  }
+
+  return { overrides, available, currentModel: current };
 }
 
 export default function antColonyExtension(pi: ExtensionAPI) {
@@ -85,13 +100,8 @@ For simple single-file tasks, work directly without the colony.`,
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const details: ColonyDetails = { state: null, phase: "initializing", log: [] };
 
-      // Resolve models: use current session model for worker/soldier, find a cheap model for scout
-      const currentModel = ctx.model?.id;
-      const modelOverrides: Record<string, string> = {};
-      if (currentModel) {
-        modelOverrides.worker = currentModel;
-        modelOverrides.soldier = currentModel;
-      }
+      // Resolve models: smart discovery from registry
+      const { overrides: modelOverrides, available, currentModel } = resolveModels(ctx);
 
       const emit = () => {
         const summary = details.state
@@ -137,6 +147,8 @@ For simple single-file tasks, work directly without the colony.`,
           maxAnts: params.maxAnts,
           maxCost: params.maxCost,
           modelOverrides,
+          availableModels: available,
+          currentModel,
           signal: signal ?? undefined,
           callbacks,
         });

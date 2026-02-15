@@ -14,9 +14,9 @@
 
 import type {
   ColonyState, Task, Ant, AntCaste, ColonyMetrics,
-  ConcurrencyConfig, TaskPriority, ModelOverrides,
+  ConcurrencyConfig, TaskPriority, ModelOverrides, AvailableModel,
 } from "./types.js";
-import { DEFAULT_ANT_CONFIGS } from "./types.js";
+import { DEFAULT_ANT_CONFIGS, resolveModelForCaste } from "./types.js";
 import { Nest } from "./nest.js";
 import { spawnAnt, makeTaskId } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
@@ -35,6 +35,8 @@ export interface QueenOptions {
   maxAnts?: number;
   maxCost?: number;
   modelOverrides?: ModelOverrides;
+  availableModels?: AvailableModel[];
+  currentModel?: string;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
 }
@@ -142,9 +144,15 @@ async function runAntWave(
   callbacks: QueenCallbacks,
   modelOverrides?: ModelOverrides,
   maxCost?: number,
+  availableModels?: AvailableModel[],
+  currentModel?: string,
 ): Promise<"ok" | "budget_exceeded"> {
   const config = { ...DEFAULT_ANT_CONFIGS[caste] };
-  if (modelOverrides?.[caste]) config.model = modelOverrides[caste];
+  if (modelOverrides?.[caste]) {
+    config.model = modelOverrides[caste];
+  } else if (!config.model && availableModels?.length) {
+    config.model = resolveModelForCaste(caste, availableModels, currentModel) ?? "";
+  }
 
   let backoffMs = 0; // 429 退避时间
 
@@ -305,6 +313,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   const { signal, callbacks } = opts;
   const mo = opts.modelOverrides;
   const mc = opts.maxCost;
+  const am = opts.availableModels;
+  const cm = opts.currentModel;
 
   const budgetStop = (phase: string) => {
     nest.updateState({ status: "budget_exceeded", finishedAt: Date.now() });
@@ -317,7 +327,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   try {
     // ═══ Phase 1: 侦察 ═══
     callbacks.onPhase("scouting", "Dispatching scout ants to explore codebase...");
-    if (await runAntWave(nest, opts.cwd, "scout", signal, callbacks, mo, mc) === "budget_exceeded")
+    if (await runAntWave(nest, opts.cwd, "scout", signal, callbacks, mo, mc, am, cm) === "budget_exceeded")
       return budgetStop("Budget exceeded during scouting");
 
     // 检查侦察结果，如果没有产生工蚁任务，用侦察结果让女王自己拆
@@ -334,7 +344,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     // ═══ Phase 2: 工作 ═══
     nest.updateState({ status: "working" });
     callbacks.onPhase("working", `${workerTasks.length} tasks discovered. Dispatching worker ants...`);
-    if (await runAntWave(nest, opts.cwd, "worker", signal, callbacks, mo, mc) === "budget_exceeded")
+    if (await runAntWave(nest, opts.cwd, "worker", signal, callbacks, mo, mc, am, cm) === "budget_exceeded")
       return budgetStop("Budget exceeded during working");
 
     // 处理工蚁产生的子任务（可能有多轮）
@@ -346,7 +356,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       if (remaining.length === 0) break;
       rounds++;
       callbacks.onPhase("working", `Round ${rounds + 1}: ${remaining.length} sub-tasks from workers...`);
-      if (await runAntWave(nest, opts.cwd, "worker", signal, callbacks, mo, mc) === "budget_exceeded")
+      if (await runAntWave(nest, opts.cwd, "worker", signal, callbacks, mo, mc, am, cm) === "budget_exceeded")
         return budgetStop("Budget exceeded during sub-tasks");
     }
 
@@ -357,7 +367,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       callbacks.onPhase("reviewing", "Dispatching soldier ants to review changes...");
       const reviewTask = makeReviewTask(completedWorkerTasks);
       nest.writeTask(reviewTask);
-      if (await runAntWave(nest, opts.cwd, "soldier", signal, callbacks, mo, mc) === "budget_exceeded")
+      if (await runAntWave(nest, opts.cwd, "soldier", signal, callbacks, mo, mc, am, cm) === "budget_exceeded")
         return budgetStop("Budget exceeded during review");
 
       // 兵蚁产生的修复任务
@@ -367,7 +377,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       if (fixTasks.length > 0) {
         nest.updateState({ status: "working" });
         callbacks.onPhase("working", `${fixTasks.length} fix tasks from review. Dispatching workers...`);
-        if (await runAntWave(nest, opts.cwd, "worker", signal, callbacks, mo, mc) === "budget_exceeded")
+        if (await runAntWave(nest, opts.cwd, "worker", signal, callbacks, mo, mc, am, cm) === "budget_exceeded")
           return budgetStop("Budget exceeded during fixes");
       }
     }

@@ -204,6 +204,7 @@ export async function spawnAnt(
   antConfig: Omit<AntConfig, "systemPrompt">,
   signal?: AbortSignal,
 ): Promise<AntResult> {
+  if (!antConfig.model) throw new Error("No model resolved for ant");
   const antId = makeAntId(antConfig.caste);
   const ant: Ant = {
     id: antId,

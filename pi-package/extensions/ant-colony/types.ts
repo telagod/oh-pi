@@ -14,13 +14,68 @@ export interface AntConfig {
 }
 
 export const DEFAULT_ANT_CONFIGS: Record<AntCaste, Omit<AntConfig, "systemPrompt">> = {
-  scout:   { caste: "scout",   model: "claude-haiku-4-5",   tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 5 },
-  worker:  { caste: "worker",  model: "claude-sonnet-4-5",  tools: ["read", "bash", "edit", "write", "grep", "find", "ls"], maxTurns: 15 },
-  soldier: { caste: "soldier", model: "claude-sonnet-4-5",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 8 },
+  scout:   { caste: "scout",   model: "",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 5 },
+  worker:  { caste: "worker",  model: "",  tools: ["read", "bash", "edit", "write", "grep", "find", "ls"], maxTurns: 15 },
+  soldier: { caste: "soldier", model: "",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 8 },
+};
+
+// ═══ 模型层级 ═══
+export type ModelTier = "fast" | "balanced" | "powerful";
+
+export const CASTE_MODEL_TIER: Record<AntCaste, ModelTier> = {
+  scout: "fast",
+  worker: "powerful",
+  soldier: "balanced",
+};
+
+export const MODEL_TIER_KEYWORDS: Record<ModelTier, string[]> = {
+  fast:     ["haiku", "mini", "flash", "nano", "small"],
+  balanced: ["sonnet", "gpt-4o", "pro"],
+  powerful: ["opus", "o1", "o3", "deepthink"],
 };
 
 /** Per-caste model overrides from user config */
 export type ModelOverrides = Partial<Record<AntCaste, string>>;
+
+export interface AvailableModel {
+  id: string;
+  cost?: { input: number };
+}
+
+/**
+ * 根据 caste 的 ModelTier 从可用模型中匹配最合适的模型
+ * - fast（侦察蚁）：关键词匹配轻量模型，优先同 provider
+ * - balanced/powerful（工蚁/兵蚁）：优先用当前会话模型，否则关键词匹配
+ * - fallback：按 cost 排序选择
+ */
+export function resolveModelForCaste(
+  caste: AntCaste,
+  available: AvailableModel[],
+  currentModel?: string,
+): string | undefined {
+  if (available.length === 0) return currentModel;
+  const tier = CASTE_MODEL_TIER[caste];
+
+  // 工蚁/兵蚁优先使用当前会话模型
+  if (tier !== "fast" && currentModel) return currentModel;
+
+  const keywords = MODEL_TIER_KEYWORDS[tier];
+  // 优先匹配同 provider（从 currentModel 提取 provider 前缀）
+  const provider = currentModel?.split("-")[0];
+  const sameProvider = provider ? available.filter(m => m.id.toLowerCase().startsWith(provider)) : [];
+  const pool = sameProvider.length > 0 ? sameProvider : available;
+  const match = pool.find(m => keywords.some(k => m.id.toLowerCase().includes(k)));
+  if (match) return match.id;
+  // 扩大搜索范围
+  if (sameProvider.length > 0) {
+    const allMatch = available.find(m => keywords.some(k => m.id.toLowerCase().includes(k)));
+    if (allMatch) return allMatch.id;
+  }
+  // Fallback：按 cost 排序
+  const sorted = [...available].sort((a, b) => (a.cost?.input ?? 0) - (b.cost?.input ?? 0));
+  if (tier === "fast") return sorted[0].id;
+  return currentModel ?? sorted[sorted.length - 1].id;
+}
 
 // ═══ 任务 (Food Source) ═══
 export type TaskStatus = "pending" | "claimed" | "active" | "done" | "failed" | "blocked";
