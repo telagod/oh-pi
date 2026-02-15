@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, readFileSync, copyFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, copyFileSync, existsSync, readdirSync, statSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -10,6 +10,12 @@ const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 function ensureDir(dir: string) {
   mkdirSync(dir, { recursive: true });
+}
+
+/** Remove and recreate a directory */
+function cleanDir(dir: string) {
+  if (existsSync(dir)) rmSync(dir, { recursive: true });
+  ensureDir(dir);
 }
 
 /** Recursively copy a directory */
@@ -121,7 +127,7 @@ export function applyConfig(config: OhPConfig) {
 
   // 6. Copy extensions (single file .ts or directory with index.ts)
   const extDir = join(agentDir, "extensions");
-  ensureDir(extDir);
+  cleanDir(extDir);
   for (const ext of config.extensions) {
     const dirSrc = join(PKG_ROOT, "pi-package", "extensions", ext);
     const fileSrc = join(PKG_ROOT, "pi-package", "extensions", `${ext}.ts`);
@@ -134,7 +140,7 @@ export function applyConfig(config: OhPConfig) {
 
   // 7. Copy prompts
   const promptDir = join(agentDir, "prompts");
-  ensureDir(promptDir);
+  cleanDir(promptDir);
   for (const p of config.prompts) {
     const src = join(PKG_ROOT, "pi-package", "prompts", `${p}.md`);
     try { copyFileSync(src, join(promptDir, `${p}.md`)); } catch { /* skip */ }
@@ -142,7 +148,7 @@ export function applyConfig(config: OhPConfig) {
 
   // 8. Copy skills
   const skillDir = join(agentDir, "skills");
-  ensureDir(skillDir);
+  cleanDir(skillDir);
   for (const s of config.skills) {
     const srcDir = join(PKG_ROOT, "pi-package", "skills", s);
     const destDir = join(skillDir, s);
@@ -152,7 +158,7 @@ export function applyConfig(config: OhPConfig) {
 
   // 9. Copy themes (only custom ones)
   const themeDir = join(agentDir, "themes");
-  ensureDir(themeDir);
+  cleanDir(themeDir);
   const themeSrc = join(PKG_ROOT, "pi-package", "themes", `${config.theme}.json`);
   try { copyFileSync(themeSrc, join(themeDir, `${config.theme}.json`)); } catch { /* built-in theme */ }
 }
