@@ -57,14 +57,14 @@ export default function (pi: ExtensionAPI) {
 					const pctColor = pct > 75 ? "error" : pct > 50 ? "warning" : "success";
 
 					const tokenStats = [
-						theme.fg("accent", `i${fmt(input)}`),
-						theme.fg("dim", `o${fmt(output)}`),
-						theme.fg("muted", `r${fmt(remaining)}`),
+						theme.fg("accent", `↑${fmt(input)}`),
+						theme.fg("dim", `↓${fmt(output)}`),
+						theme.fg("muted", `⇣${fmt(remaining)}`),
 						theme.fg("warning", `$${cost.toFixed(3)}`),
 						theme.fg(pctColor, `${pct.toFixed(0)}%`),
 					].join(" ");
 
-					const elapsed = theme.fg("dim", formatElapsed(Date.now() - sessionStart));
+					const elapsed = theme.fg("dim", `⏱${formatElapsed(Date.now() - sessionStart)}`);
 
 					const parts = process.cwd().split("/");
 					const short = parts.length > 2 ? parts.slice(-2).join("/") : process.cwd();
