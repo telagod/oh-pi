@@ -85,8 +85,8 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
       apiKey = await promptKey(info.label);
     }
 
-    // Model selection — try dynamic fetch, fall back to static list
-    const defaultModel = await selectModel(info.label, info.models, undefined, apiKey);
+    // Model selection — try dynamic fetch for custom endpoints, fall back to static list
+    const defaultModel = await selectModel(info.label, info.models, baseUrl, apiKey);
 
     configs.push({ name, apiKey, defaultModel, baseUrl });
     p.log.success(t("provider.configured", { label: info.label }));

@@ -76,7 +76,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
 
 /** 支持的提供商注册表（名称、环境变量、可用模型） */
 export const PROVIDERS: Record<string, { env: string; label: string; models: string[] }> = {
-  anthropic:  { env: "ANTHROPIC_API_KEY",  label: "Anthropic (Claude)",     models: ["claude-sonnet-4-20250514", "claude-opus-4-0520"] },
+  anthropic:  { env: "ANTHROPIC_API_KEY",  label: "Anthropic (Claude)",     models: ["claude-sonnet-4-20250514", "claude-sonnet-4-5-20250929", "claude-opus-4-20250514", "claude-haiku-4-5-20251001"] },
   openai:     { env: "OPENAI_API_KEY",     label: "OpenAI (GPT)",           models: ["gpt-4o", "o3-mini"] },
   google:     { env: "GEMINI_API_KEY",     label: "Google Gemini",          models: ["gemini-2.5-pro", "gemini-2.5-flash"] },
   groq:       { env: "GROQ_API_KEY",       label: "Groq (Free, Fast)",      models: ["llama-3.3-70b-versatile"] },
