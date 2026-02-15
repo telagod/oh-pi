@@ -58,8 +58,26 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
     const info = PROVIDERS[name]!;
     const envVal = process.env[info.env];
 
+    // Ask if user wants a custom endpoint for this provider
+    const useCustomUrl = await p.confirm({
+      message: t("provider.useCustomUrl", { label: info.label }),
+      initialValue: false,
+    });
+    if (p.isCancel(useCustomUrl)) { p.cancel(t("cancelled")); process.exit(0); }
+
+    let baseUrl: string | undefined;
+    if (useCustomUrl) {
+      const url = await p.text({
+        message: t("provider.baseUrl", { label: info.label }),
+        placeholder: "https://proxy.example.com",
+        validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : undefined,
+      });
+      if (p.isCancel(url)) { p.cancel(t("cancelled")); process.exit(0); }
+      baseUrl = url;
+    }
+
     let apiKey: string;
-    if (envVal) {
+    if (envVal && !baseUrl) {
       const useEnv = await p.confirm({ message: t("provider.foundEnv", { env: chalk.cyan(info.env) }) });
       if (p.isCancel(useEnv)) { p.cancel(t("cancelled")); process.exit(0); }
       apiKey = useEnv ? info.env : await promptKey(info.label);
@@ -70,7 +88,7 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
     // Model selection — try dynamic fetch, fall back to static list
     const defaultModel = await selectModel(info.label, info.models, undefined, apiKey);
 
-    configs.push({ name, apiKey, defaultModel });
+    configs.push({ name, apiKey, defaultModel, baseUrl });
     p.log.success(t("provider.configured", { label: info.label }));
   }
 
