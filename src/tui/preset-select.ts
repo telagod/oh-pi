@@ -8,7 +8,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
   starter: {
     labelKey: "preset.starter", hintKey: "preset.starterHint",
     config: {
-      theme: "oh-p-dark", keybindings: "default", thinking: "medium",
+      theme: "dark", keybindings: "default", thinking: "medium",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header"],
       skills: ["quick-setup", "debug-helper"],
       prompts: ["review", "fix", "explain", "commit"],
@@ -55,7 +55,7 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
   full: {
     labelKey: "preset.full", hintKey: "preset.fullHint",
     config: {
-      theme: "oh-p-dark", keybindings: "default", thinking: "high",
+      theme: "dark", keybindings: "default", thinking: "high",
       extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "ant-colony"],
       skills: ["quick-setup", "debug-helper", "git-workflow", "ant-colony"],
       prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "security", "document", "pr"],

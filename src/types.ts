@@ -63,13 +63,13 @@ export const PROVIDERS: Record<string, { env: string; label: string; models: str
 };
 
 export const THEMES = [
+  { name: "dark",             label: "Pi Default Dark",            style: "dark" },
   { name: "oh-p-dark",        label: "oh-pi Dark (Cyan+Purple)",   style: "dark" },
   { name: "cyberpunk",        label: "Cyberpunk (Neon)",           style: "dark" },
   { name: "nord",             label: "Nord (Arctic)",              style: "dark" },
   { name: "catppuccin-mocha", label: "Catppuccin Mocha (Pastel)",  style: "dark" },
   { name: "tokyo-night",      label: "Tokyo Night (Blue+Purple)",  style: "dark" },
   { name: "gruvbox-dark",     label: "Gruvbox Dark (Warm)",        style: "dark" },
-  { name: "dark",             label: "Pi Default Dark",            style: "dark" },
   { name: "light",            label: "Pi Default Light",           style: "light" },
 ];
 
