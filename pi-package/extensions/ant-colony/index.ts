@@ -1,19 +1,20 @@
 /**
  * 🐜 蚁群模式 (Ant Colony) — pi 扩展入口
  *
- * 注册：
- * - ant_colony tool：LLM 可调用启动蚁群
- * - /colony command：用户手动启动
- * - TUI 渲染：实时显示蚁群状态
+ * 深度整合 pi 生态：
+ * - SDK 内嵌蚂蚁（createAgentSession 替代子进程）
+ * - ctx.ui.setWidget() 实时蚂蚁面板
+ * - ctx.ui.setStatus() footer 进度
+ * - onAntStream 真实时 token 流
  */
 
 import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text, Container, Spacer, Box } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { Text, Container, Spacer } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
-import type { ColonyState, ColonyMetrics, Ant, Task } from "./types.js";
+import type { ColonyState, ColonyMetrics, Ant, Task, AntStreamEvent } from "./types.js";
 
 interface ColonyDetails {
   state: ColonyState | null;
@@ -48,7 +49,7 @@ function casteIcon(caste: string): string {
   return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : "⚒️";
 }
 
-/** 渲染进度条 ▓░ */
+/** 渲染进度条 */
 function progressBar(done: number, total: number, width: number, theme: any): string {
   if (total === 0) return "";
   const pct = Math.min(done / total, 1);
@@ -58,7 +59,7 @@ function progressBar(done: number, total: number, width: number, theme: any): st
   return `${bar} ${theme.fg("accent", `${done}/${total}`)}`;
 }
 
-/** 渲染阶段流水线 scout → work → review → done */
+/** 渲染阶段流水线 */
 function phasePipeline(status: string, theme: any): string {
   const phases = [
     { key: "scouting",  icon: "🔍", label: "Scout" },
@@ -75,17 +76,24 @@ function phasePipeline(status: string, theme: any): string {
   }).join(theme.fg("muted", " → "));
 }
 
+/** 实时蚂蚁流状态管理 */
+interface AntStreamState {
+  antId: string;
+  caste: string;
+  taskTitle: string;
+  lastLine: string;  // 最后一行输出（截断）
+  tokens: number;
+}
 
 export default function antColonyExtension(pi: ExtensionAPI) {
 
-  // ═══ Auto-trigger: 注入蚁群意识，LLM 自动判断何时启动 ═══
+  // ═══ Auto-trigger: 注入蚁群意识 ═══
   pi.on("before_agent_start", async (ctx) => {
-    // 获取可用模型列表
     let modelList = "";
     try {
       const { execSync } = await import("node:child_process");
       const output = execSync("pi --list-models 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
-      const models = output.trim().split("\n").slice(1) // skip header
+      const models = output.trim().split("\n").slice(1)
         .map(l => l.trim().split(/\s+/))
         .filter(p => p.length >= 2)
         .map(p => `${p[0]}/${p[1]}`);
@@ -140,14 +148,75 @@ Strategy for choosing per-caste models:
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const details: ColonyDetails = { state: null, phase: "initializing", log: [] };
 
-      // 所有蚂蚁统一使用当前会话模型
-      const currentModel = ctx.model?.id;
+      const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
       if (!currentModel) {
         return {
           content: [{ type: "text", text: "Colony failed: no model available in current session" }],
           isError: true,
         };
       }
+
+      // ─── 实时流状态 ───
+      const antStreams = new Map<string, AntStreamState>();
+      let widgetHandle: ReturnType<typeof ctx.ui.setWidget> | undefined;
+
+      const updateWidget = () => {
+        if (!ctx.hasUI) return;
+        const state = details.state;
+        const streams = Array.from(antStreams.values());
+
+        const lines: string[] = [];
+
+        // 标题行
+        const phase = details.phase || "initializing";
+        const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
+        const cost = state ? formatCost(state.metrics.totalCost) : "$0";
+        lines.push(`🐜 Colony: ${phase} │ ${elapsed} │ ${cost}`);
+
+        // 进度条
+        if (state && state.metrics.tasksTotal > 0) {
+          const m = state.metrics;
+          const pct = Math.round((m.tasksDone / m.tasksTotal) * 100);
+          const filled = Math.round(pct / 5);
+          const bar = "█".repeat(filled) + "░".repeat(20 - filled);
+          lines.push(`  ${bar} ${m.tasksDone}/${m.tasksTotal} (${pct}%)`);
+        }
+
+        // 活跃蚂蚁的实时输出
+        if (streams.length > 0) {
+          for (const s of streams.slice(-4)) {
+            const icon = casteIcon(s.caste);
+            const line = s.lastLine.length > 60 ? s.lastLine.slice(0, 57) + "..." : s.lastLine;
+            lines.push(`  ${icon} ${s.antId.slice(0, 15)} ▸ ${line || "..."}`);
+          }
+        }
+
+        ctx.ui.setWidget("ant-colony", lines);
+      };
+
+      const updateStatus = () => {
+        if (!ctx.hasUI) return;
+        const state = details.state;
+        if (!state) {
+          ctx.ui.setStatus("ant-colony", "🐜 Colony initializing...");
+          return;
+        }
+        const m = state.metrics;
+        const active = antStreams.size;
+        ctx.ui.setStatus("ant-colony",
+          `🐜 ${statusIcon(state.status)} ${m.tasksDone}/${m.tasksTotal} tasks │ ${active} active │ ${formatCost(m.totalCost)}`
+        );
+      };
+
+      // 节流渲染（最多 200ms 一次）
+      let lastRender = 0;
+      const throttledRender = () => {
+        const now = Date.now();
+        if (now - lastRender < 200) return;
+        lastRender = now;
+        updateWidget();
+        updateStatus();
+      };
 
       const emit = () => {
         const summary = details.state
@@ -157,6 +226,7 @@ Strategy for choosing per-caste models:
           content: [{ type: "text", text: summary }],
           details: { ...details },
         });
+        throttledRender();
       };
 
       const callbacks: QueenCallbacks = {
@@ -166,14 +236,32 @@ Strategy for choosing per-caste models:
           emit();
         },
         onAntSpawn(ant, task) {
+          antStreams.set(ant.id, {
+            antId: ant.id,
+            caste: ant.caste,
+            taskTitle: task.title.slice(0, 50),
+            lastLine: "starting...",
+            tokens: 0,
+          });
           details.log.push(`  ${casteIcon(ant.caste)} ${ant.caste} ant dispatched → ${task.title.slice(0, 50)}`);
           emit();
         },
         onAntDone(ant, task, output) {
+          antStreams.delete(ant.id);
           const dur = ant.finishedAt ? formatDuration(ant.finishedAt - ant.startedAt) : "?";
           const icon = ant.status === "done" ? "✓" : "✗";
           details.log.push(`  ${icon} ${ant.caste} ant finished (${dur}, ${formatCost(ant.usage.cost)}) → ${task.title.slice(0, 50)}`);
           emit();
+        },
+        onAntStream(event: AntStreamEvent) {
+          const stream = antStreams.get(event.antId);
+          if (stream) {
+            stream.tokens++;
+            // 取最后一行非空文本作为预览
+            const lines = event.totalText.split("\n").filter(l => l.trim());
+            stream.lastLine = lines[lines.length - 1]?.trim() || "...";
+          }
+          throttledRender();
         },
         onProgress(metrics) {
           if (details.state) details.state.metrics = metrics;
@@ -182,6 +270,10 @@ Strategy for choosing per-caste models:
         onComplete(state) {
           details.state = state;
           details.phase = state.status === "done" ? "Colony mission complete" : "Colony failed";
+          antStreams.clear();
+          // 清理 widget 和 status
+          ctx.ui.setWidget("ant-colony", undefined);
+          ctx.ui.setStatus("ant-colony", undefined);
           emit();
         },
       };
@@ -199,6 +291,10 @@ Strategy for choosing per-caste models:
         if (params.workerModel) modelOverrides.worker = params.workerModel;
         if (params.soldierModel) modelOverrides.soldier = params.soldierModel;
 
+        // 初始化 widget
+        updateStatus();
+        updateWidget();
+
         const state = await runColony({
           cwd: ctx.cwd,
           goal: params.goal,
@@ -208,6 +304,8 @@ Strategy for choosing per-caste models:
           modelOverrides,
           signal: signal ?? undefined,
           callbacks,
+          authStorage: undefined,
+          modelRegistry: ctx.modelRegistry ?? undefined,
         });
 
         details.state = state;
@@ -249,6 +347,9 @@ Strategy for choosing per-caste models:
           isError: state.status === "failed" || state.status === "budget_exceeded",
         };
       } catch (e) {
+        // 清理 UI
+        ctx.ui.setWidget("ant-colony", undefined);
+        ctx.ui.setStatus("ant-colony", undefined);
         return {
           content: [{ type: "text", text: `Colony failed: ${e}` }],
           details: { ...details },
@@ -281,7 +382,6 @@ Strategy for choosing per-caste models:
           const m = state.metrics;
           const elapsed = formatDuration(Date.now() - state.createdAt);
 
-          // 标题行：● N ants launched (phase)
           const activeAnts = state.ants.filter(a => a.status === "working");
           const totalAnts = state.ants.length;
           container.addChild(new Text(
@@ -292,12 +392,10 @@ Strategy for choosing per-caste models:
             0, 0,
           ));
 
-          // 进度条
           if (m.tasksTotal > 0) {
             container.addChild(new Text(`  ${progressBar(m.tasksDone, m.tasksTotal, 20, theme)}`, 0, 0));
           }
 
-          // 蚂蚁树
           const ants = expanded ? state.ants : state.ants.slice(-8);
           for (let i = 0; i < ants.length; i++) {
             const a = ants[i];
@@ -338,11 +436,9 @@ Strategy for choosing per-caste models:
           ));
         }
 
-        // 最近日志（仅展开时）
         if (expanded && log.length > 0) {
           container.addChild(new Spacer(1));
-          const recent = log.slice(-10);
-          for (const l of recent) {
+          for (const l of log.slice(-10)) {
             container.addChild(new Text(theme.fg("dim", `  ${l}`), 0, 0));
           }
         }
@@ -359,7 +455,6 @@ Strategy for choosing per-caste models:
       if (!expanded) {
         const container = new Container();
 
-        // 标题行：状态 + 统计
         const icon = ok ? theme.fg("success", "✓") : theme.fg("error", "✗");
         container.addChild(new Text(
           `${icon} ${theme.fg("toolTitle", theme.bold("ant colony "))}` +
@@ -369,10 +464,8 @@ Strategy for choosing per-caste models:
           0, 0,
         ));
 
-        // 进度条
         container.addChild(new Text(`  ${progressBar(m.tasksDone, m.tasksTotal, 20, theme)} ${theme.fg("muted", `(${m.tasksFailed} failed)`)}`, 0, 0));
 
-        // 任务列表（最多6条）
         for (const t of state.tasks.slice(0, 6)) {
           const ti = t.status === "done" ? theme.fg("success", "✓")
             : t.status === "failed" ? theme.fg("error", "✗")
@@ -392,7 +485,6 @@ Strategy for choosing per-caste models:
       // ─── 展开视图 ───
       const container = new Container();
 
-      // 标题 + 阶段流水线
       const icon = ok ? theme.fg("success", "✓") : theme.fg("error", "✗");
       container.addChild(new Text(
         `${icon} ${theme.fg("toolTitle", theme.bold("ant colony "))}` +
@@ -403,11 +495,9 @@ Strategy for choosing per-caste models:
       container.addChild(new Text(`  ${phasePipeline(state.status, theme)}`, 0, 0));
       container.addChild(new Text(theme.fg("dim", `  ${state.goal}`), 0, 0));
 
-      // 进度条
       container.addChild(new Spacer(1));
       container.addChild(new Text(`  ${progressBar(m.tasksDone, m.tasksTotal, 30, theme)}`, 0, 0));
 
-      // 任务区
       container.addChild(new Spacer(1));
       container.addChild(new Text(theme.fg("muted", `  ─── Tasks (${m.tasksDone}/${m.tasksTotal}) ───`), 0, 0));
       for (const t of state.tasks) {
@@ -425,7 +515,6 @@ Strategy for choosing per-caste models:
         }
       }
 
-      // 蚂蚁区
       container.addChild(new Spacer(1));
       container.addChild(new Text(theme.fg("muted", `  ─── Ants (${m.antsSpawned}) ───`), 0, 0));
       for (const a of state.ants) {
@@ -437,7 +526,6 @@ Strategy for choosing per-caste models:
         ));
       }
 
-      // 并发 + 日志
       container.addChild(new Spacer(1));
       const c = state.concurrency;
       container.addChild(new Text(
@@ -456,7 +544,7 @@ Strategy for choosing per-caste models:
     },
   });
 
-  // ═══ Command: /colony — 直接执行，零确认 ═══
+  // ═══ Command: /colony ═══
   pi.registerCommand("colony", {
     description: "Launch an ant colony. Usage: /colony <goal>",
     async handler(args, ctx) {
@@ -472,7 +560,6 @@ Strategy for choosing per-caste models:
   pi.registerCommand("colony-status", {
     description: "Show status of the last ant colony run",
     async handler(_args, ctx) {
-      // 从 session 中找最近的 ant_colony tool result
       const entries = ctx.sessionManager.getEntries();
       for (let i = entries.length - 1; i >= 0; i--) {
         const e = entries[i] as any;

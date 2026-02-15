@@ -79,6 +79,15 @@ export interface Ant {
   finishedAt: number | null;
 }
 
+// ═══ 流式回调 ═══
+export interface AntStreamEvent {
+  antId: string;
+  caste: AntCaste;
+  taskId: string;
+  delta: string;        // text token delta
+  totalText: string;    // accumulated text so far
+}
+
 // ═══ 蚁巢状态 ═══
 export interface ColonyState {
   id: string;
