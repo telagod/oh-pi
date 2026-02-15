@@ -73,7 +73,7 @@ export function resolveModelForCaste(
   }
   // Fallback：按 cost 排序
   const sorted = [...available].sort((a, b) => (a.cost?.input ?? 0) - (b.cost?.input ?? 0));
-  if (tier === "fast") return sorted[0].id;
+  if (tier === "fast") return currentModel ?? sorted[0].id;
   return currentModel ?? sorted[sorted.length - 1].id;
 }
 
