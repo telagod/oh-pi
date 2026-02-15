@@ -1,5 +1,5 @@
 import * as p from "@clack/prompts";
-import { selectLanguage } from "./i18n.js";
+import { selectLanguage, getLocale } from "./i18n.js";
 import { t } from "./i18n.js";
 import { welcome } from "./tui/welcome.js";
 import { selectMode } from "./tui/mode-select.js";
@@ -29,6 +29,7 @@ export async function run() {
     config = await customFlow(env);
   }
 
+  config.locale = getLocale();
   await confirmApply(config, env);
 }
 
@@ -39,7 +40,7 @@ async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
     providers,
     theme,
     keybindings: "default",
-    extensions: ["safe-guard", "git-guard", "auto-session-name"],
+    extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "startup-banner"],
     skills: ["quick-setup", "debug-helper", "git-workflow"],
     prompts: ["review", "fix", "explain", "commit", "test"],
     agents: "general-developer",

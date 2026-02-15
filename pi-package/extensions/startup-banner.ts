@@ -1,32 +1,55 @@
-import type { ExtensionContext, PiSdk } from "@anthropic/pi-sdk";
+/**
+ * oh-pi Startup Banner Extension
+ *
+ * Replaces the built-in verbose header with a compact one-line info display.
+ * Auto-restores the default header after 8 seconds.
+ */
+import type { AssistantMessage } from "@mariozechner/pi-ai";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-export default function activate(pi: PiSdk) {
-  pi.on("session_start", async (_event, ctx: ExtensionContext) => {
+export default function (pi: ExtensionAPI) {
+  pi.on("session_start", async (_event, ctx) => {
+    if (!ctx.hasUI) return;
+
     const model = ctx.model;
     const thinking = pi.getThinkingLevel();
     const usage = ctx.getContextUsage();
-    const branch = ctx.sessionManager.getBranch();
-    const session = ctx.sessionManager.getSessionFile() ?? "ephemeral";
     const cwd = process.cwd().replace(process.env.HOME ?? "", "~");
+
+    // Sum cost from branch
+    let totalCost = 0;
+    for (const e of ctx.sessionManager.getBranch()) {
+      if (e.type === "message" && e.message.role === "assistant") {
+        totalCost += (e.message as AssistantMessage).usage.cost.total;
+      }
+    }
 
     // Git branch
     let git = "";
     try {
-      const { execSync } = await import("node:child_process");
-      git = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8", timeout: 2000 }).trim();
+      const { stdout } = await pi.exec("git", ["rev-parse", "--abbrev-ref", "HEAD"], { timeout: 2000 });
+      git = stdout.trim();
     } catch { /* not a git repo */ }
 
     const modelStr = model ? `${model.provider}/${model.id}` : "no model";
     const thinkStr = thinking !== "off" ? ` • 🧠 ${thinking}` : "";
     const ctxStr = usage ? ` • 📊 ${Math.round(usage.percent)}%` : "";
     const gitStr = git ? ` • 🌿 ${git}` : "";
-    const costStr = branch ? ` • $${(branch.totalCost ?? 0).toFixed(3)}` : "";
+    const costStr = totalCost > 0 ? ` • $${totalCost.toFixed(3)}` : "";
 
-    const line = `⚡ ${modelStr}${thinkStr}${ctxStr}${costStr} │ 📂 ${cwd}${gitStr} │ 📋 ${session.split("/").pop()}`;
+    const session = ctx.sessionManager.getSessionFile?.() ?? "ephemeral";
+    const sessionName = session.split("/").pop();
 
-    ctx.ui.setWidget("startup-banner", [line], { placement: "belowEditor" });
+    const line = `⚡ ${modelStr}${thinkStr}${ctxStr}${costStr} │ 📂 ${cwd}${gitStr} │ 📋 ${sessionName}`;
 
-    // Auto-hide after 8 seconds
-    setTimeout(() => ctx.ui.setWidget("startup-banner", undefined), 8000);
+    ctx.ui.setHeader((_tui, theme) => ({
+      render(_width: number): string[] {
+        return ["", theme.fg("accent", line), ""];
+      },
+      invalidate() {},
+    }));
+
+    // Restore default header after 8 seconds
+    setTimeout(() => ctx.ui.setHeader(undefined), 8000);
   });
 }

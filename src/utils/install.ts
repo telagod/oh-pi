@@ -30,10 +30,11 @@ export function applyConfig(config: OhPConfig) {
   const agentDir = join(homedir(), ".pi", "agent");
   ensureDir(agentDir);
 
-  // 1. auth.json (skip if no providers configured)
-  if (config.providers.length > 0) {
+  // 1. auth.json (skip providers that have apiKey in models.json via baseUrl)
+  const authProviders = config.providers.filter(p => !p.baseUrl && p.apiKey !== "none");
+  if (authProviders.length > 0) {
     const auth: Record<string, { type: string; key: string }> = {};
-    for (const p of config.providers) {
+    for (const p of authProviders) {
       auth[p.name] = { type: "api_key", key: p.apiKey };
     }
     const authPath = join(agentDir, "auth.json");
@@ -68,24 +69,36 @@ export function applyConfig(config: OhPConfig) {
   // 3. models.json (custom endpoints / providers)
   const customProviders = config.providers.filter(p => p.baseUrl);
   if (customProviders.length > 0) {
-    const models: Record<string, unknown> = {};
+    const providers: Record<string, unknown> = {};
     for (const cp of customProviders) {
-      const caps = cp.defaultModel ? MODEL_CAPABILITIES[cp.defaultModel] : undefined;
-      models[cp.name] = {
-        baseUrl: cp.baseUrl,
-        apiKey: cp.apiKey === "none" ? undefined : cp.apiKey,
-        api: "openai-completions",
-        models: cp.defaultModel ? [{
-          id: cp.defaultModel,
-          name: cp.defaultModel,
-          reasoning: cp.reasoning ?? caps?.reasoning ?? false,
-          input: cp.multimodal ? ["text", "image"] : (caps?.input ?? ["text"]),
-          contextWindow: cp.contextWindow ?? caps?.contextWindow ?? 128000,
-          maxTokens: cp.maxTokens ?? caps?.maxTokens ?? 8192,
-        }] : [],
-      };
+      const isBuiltin = !!PROVIDERS[cp.name];
+      if (isBuiltin) {
+        // Known provider with custom baseUrl — just override endpoint, keep built-in models
+        const entry: Record<string, unknown> = { baseUrl: cp.baseUrl };
+        if (cp.apiKey !== "none") entry.apiKey = cp.apiKey;
+        providers[cp.name] = entry;
+      } else {
+        // Fully custom provider — need api, models, etc.
+        const caps = cp.defaultModel ? MODEL_CAPABILITIES[cp.defaultModel] : undefined;
+        const entry: Record<string, unknown> = {
+          baseUrl: cp.baseUrl,
+          api: "openai-completions",
+        };
+        if (cp.apiKey !== "none") entry.apiKey = cp.apiKey;
+        if (cp.defaultModel) {
+          entry.models = [{
+            id: cp.defaultModel,
+            name: cp.defaultModel,
+            reasoning: cp.reasoning ?? caps?.reasoning ?? false,
+            input: cp.multimodal ? ["text", "image"] : (caps?.input ?? ["text"]),
+            contextWindow: cp.contextWindow ?? caps?.contextWindow ?? 128000,
+            maxTokens: cp.maxTokens ?? caps?.maxTokens ?? 8192,
+          }];
+        }
+        providers[cp.name] = entry;
+      }
     }
-    writeFileSync(join(agentDir, "models.json"), JSON.stringify(models, null, 2));
+    writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers }, null, 2));
   }
 
   // 4. keybindings.json
@@ -97,7 +110,12 @@ export function applyConfig(config: OhPConfig) {
   // 5. AGENTS.md
   const agentsSrc = join(PKG_ROOT, "pi-package", "agents", `${config.agents}.md`);
   try {
-    const content = readFileSync(agentsSrc, "utf8");
+    let content = readFileSync(agentsSrc, "utf8");
+    if (config.locale && config.locale !== "en") {
+      const langNames: Record<string, string> = { zh: "Chinese (中文)", fr: "French (Français)" };
+      const lang = langNames[config.locale] ?? config.locale;
+      content = `## Language\nAlways respond in ${lang}. Use the user's language for all conversations and explanations. Code, commands, and technical terms can remain in English.\n\n${content}`;
+    }
     writeFileSync(join(agentDir, "AGENTS.md"), content);
   } catch { /* template not found, skip */ }
 
