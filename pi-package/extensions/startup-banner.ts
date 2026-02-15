@@ -6,6 +6,7 @@
  */
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { truncateToWidth } from "@mariozechner/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
@@ -43,8 +44,8 @@ export default function (pi: ExtensionAPI) {
     const line = `⚡ ${modelStr}${thinkStr}${ctxStr}${costStr} │ 📂 ${cwd}${gitStr} │ 📋 ${sessionName}`;
 
     ctx.ui.setHeader((_tui, theme) => ({
-      render(_width: number): string[] {
-        return ["", theme.fg("accent", line), ""];
+      render(width: number): string[] {
+        return ["", truncateToWidth(theme.fg("accent", line), width), ""];
       },
       invalidate() {},
     }));

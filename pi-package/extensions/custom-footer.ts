@@ -95,8 +95,15 @@ export default function (pi: ExtensionAPI) {
 					if (branchStr) leftParts.push(branchStr);
 					const left = leftParts.join(sep);
 
-					const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(sep) - visibleWidth(right)));
-					return [truncateToWidth(left + pad + right, width)];
+					const leftW = visibleWidth(left);
+					const rightW = visibleWidth(right);
+					const gap = width - leftW - rightW;
+					if (gap >= 2) {
+						const pad = " ".repeat(gap);
+						return [truncateToWidth(left + pad + right, width)];
+					}
+					// Not enough space for right side — just show left truncated
+					return [truncateToWidth(left, width)];
 				},
 			};
 		});
