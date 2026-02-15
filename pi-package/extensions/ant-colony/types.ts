@@ -86,7 +86,7 @@ export function resolveModelForCaste(
   const sameProvider = provider ? scored.filter(m => m.id.toLowerCase().includes(provider.toLowerCase())) : [];
   const pool = sameProvider.length > 0 ? sameProvider : scored;
 
-  if (tier === "fast") return pool[0]?.id ?? currentModel;
+  if (tier === "fast") return pool[pool.length - 1]?.id ?? currentModel;
   if (tier === "powerful") return pool[pool.length - 1]?.id ?? currentModel;
   // balanced: middle
   return pool[Math.floor(pool.length / 2)]?.id ?? currentModel;
