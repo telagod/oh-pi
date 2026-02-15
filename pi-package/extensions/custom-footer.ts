@@ -68,10 +68,10 @@ export default function (pi: ExtensionAPI) {
 
 					const parts = process.cwd().split("/");
 					const short = parts.length > 2 ? parts.slice(-2).join("/") : process.cwd();
-					const cwdStr = theme.fg("muted", short);
+					const cwdStr = theme.fg("muted", `⌂ ${short}`);
 
 					const branch = footerData.getGitBranch();
-					const branchStr = branch ? theme.fg("accent", branch) : "";
+					const branchStr = branch ? theme.fg("accent", `⎇ ${branch}`) : "";
 
 					const thinking = pi.getThinkingLevel();
 					const modelId = ctx.model?.id || "no-model";
