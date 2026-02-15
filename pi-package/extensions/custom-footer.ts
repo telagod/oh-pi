@@ -75,12 +75,14 @@ export default function (pi: ExtensionAPI) {
 
 					const thinking = pi.getThinkingLevel();
 					const modelId = ctx.model?.id || "no-model";
-					const right = theme.fg("dim", `${modelId} ${thinking}`);
+					const modelStr = theme.fg("accent", `◆ ${modelId}`);
 
 					const sep = theme.fg("dim", " | ");
-					const leftParts = [tokenStats, elapsed, cwdStr];
+					const leftParts = [modelStr, tokenStats, elapsed, cwdStr];
 					if (branchStr) leftParts.push(branchStr);
 					const left = leftParts.join(sep);
+
+					const right = theme.fg("dim", thinking);
 
 					const leftW = visibleWidth(left);
 					const rightW = visibleWidth(right);
