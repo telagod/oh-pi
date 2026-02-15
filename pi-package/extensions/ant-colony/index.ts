@@ -159,6 +159,77 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     });
   });
 
+  // ─── 同步模式（print mode）：阻塞等待蚁群完成 ───
+
+  async function runSyncColony(params: {
+    goal: string;
+    maxAnts?: number;
+    maxCost?: number;
+    currentModel: string;
+    modelOverrides: Record<string, string>;
+    cwd: string;
+    modelRegistry?: any;
+  }, signal?: AbortSignal | null) {
+    const gitignorePath = join(params.cwd, ".gitignore");
+    const gitContent = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
+    if (!gitContent.includes(".ant-colony/")) {
+      appendFileSync(gitignorePath, `${gitContent.length && !gitContent.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
+    }
+
+    const log: string[] = [];
+    const callbacks: QueenCallbacks = {
+      onPhase(_phase, detail) { log.push(detail); },
+      onAntSpawn(ant, task) { log.push(`  ${casteIcon(ant.caste)} ${ant.caste} → ${task.title.slice(0, 50)}`); },
+      onAntDone(ant, task) {
+        const dur = ant.finishedAt ? formatDuration(ant.finishedAt - ant.startedAt) : "?";
+        log.push(`  ${ant.status === "done" ? "✓" : "✗"} ${ant.caste} (${dur}) → ${task.title.slice(0, 50)}`);
+      },
+      onAntStream() {},
+      onProgress() {},
+      onComplete() {},
+    };
+
+    try {
+      const state = await runColony({
+        cwd: params.cwd,
+        goal: params.goal,
+        maxAnts: params.maxAnts,
+        maxCost: params.maxCost,
+        currentModel: params.currentModel,
+        modelOverrides: params.modelOverrides,
+        signal: signal ?? undefined,
+        callbacks,
+        modelRegistry: params.modelRegistry,
+      });
+
+      const m = state.metrics;
+      const elapsed = state.finishedAt ? formatDuration(state.finishedAt - state.createdAt) : "?";
+      const report = [
+        `## 🐜 Ant Colony Report`,
+        `**Goal:** ${state.goal}`,
+        `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed}`,
+        `**Metrics:** ${m.tasksDone}/${m.tasksTotal} tasks │ ${m.antsSpawned} ants │ ${formatTokens(m.totalTokens)} │ ${formatCost(m.totalCost)}`,
+        ``,
+        ...state.tasks.filter(t => t.status === "done").map(t =>
+          `- ✓ **${t.title}**${t.result ? `: ${t.result.split("\n")[0]?.slice(0, 100)}` : ""}`
+        ),
+        ...state.tasks.filter(t => t.status === "failed").map(t =>
+          `- ✗ **${t.title}** — ${t.error?.slice(0, 100) || "unknown"}`
+        ),
+      ].join("\n");
+
+      return {
+        content: [{ type: "text" as const, text: report }],
+        isError: state.status === "failed" || state.status === "budget_exceeded",
+      };
+    } catch (e) {
+      return {
+        content: [{ type: "text" as const, text: `Colony failed: ${e}` }],
+        isError: true,
+      };
+    }
+  }
+
   // ─── 启动后台蚁群 ───
 
   function launchBackgroundColony(params: {
@@ -392,7 +463,7 @@ Strategy for choosing per-caste models:
       if (params.workerModel) modelOverrides.worker = params.workerModel;
       if (params.soldierModel) modelOverrides.soldier = params.soldierModel;
 
-      launchBackgroundColony({
+      const colonyParams = {
         goal: params.goal,
         maxAnts: params.maxAnts,
         maxCost: params.maxCost,
@@ -400,7 +471,15 @@ Strategy for choosing per-caste models:
         modelOverrides,
         cwd: ctx.cwd,
         modelRegistry: ctx.modelRegistry ?? undefined,
-      });
+      };
+
+      // 非交互模式（print mode）：同步等待蚁群完成
+      if (!ctx.hasUI) {
+        return await runSyncColony(colonyParams, _signal);
+      }
+
+      // 交互模式：后台运行
+      launchBackgroundColony(colonyParams);
 
       return {
         content: [{ type: "text", text: `🐜 Colony launched in background!\n\n**Goal:** ${params.goal}\n\nThe colony is now running. You can continue chatting — results will be injected when it finishes.\n\nUse \`/colony-stop\` to cancel, \`/colony-status\` to check progress.` }],
