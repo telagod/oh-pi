@@ -1,5 +1,5 @@
 /**
- * oh-pi Compact Header — table-style startup info
+ * oh-pi Compact Header — table-style startup info with dynamic column widths
  */
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { VERSION } from "@mariozechner/pi-coding-agent";
@@ -17,32 +17,48 @@ export default function (pi: ExtensionAPI) {
         const cmds = pi.getCommands();
         const prompts = cmds.filter(c => c.source === "prompt").map(c => `/${c.name}`).join("  ");
         const skills = cmds.filter(c => c.source === "skill").map(c => c.name).join("  ");
-        const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no model";
+        const model = ctx.model ? `${ctx.model.id}` : "no model";
         const thinking = pi.getThinkingLevel();
+        const provider = ctx.model?.provider ?? "";
 
         const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - visibleWidth(s)));
         const t = (s: string) => truncateToWidth(s, width);
-
-        const c0 = 8, c1 = 14, c2 = 6, c3 = 14, c4 = 6;
         const sep = d(" │ ");
 
-        const rows = [
-          [d("version"), a(`v${VERSION}`),  d("esc"), a("interrupt"),   d("S-tab"), a("thinking")],
-          [d("model"),   a(model),          d("^C"),  a("clear/exit"),  d("^O"),    a("expand")],
-          [d("think"),   a(thinking),       d("^P"),  a("cycle model"), d("^G"),    a("ext editor")],
-          [d(""),        a(""),             d("/"),   a("commands"),    d("^V"),    a("paste img")],
-          [d(""),        a(""),             d("!"),   a("bash"),        d(""),      a("")],
+        // Right two columns are fixed width
+        const rCol = [
+          [d("esc"), a("interrupt"),   d("S-tab"), a("thinking")],
+          [d("^C"),  a("clear/exit"),  d("^O"),    a("expand")],
+          [d("^P"),  a("model"),       d("^G"),    a("editor")],
+          [d("/"),   a("commands"),    d("^V"),    a("paste")],
+          [d("!"),   a("bash"),        d(""),      a("")],
+        ];
+        const k1w = 6, v1w = 13, k2w = 6, v2w = 9;
+        const rightW = k1w + v1w + 3 + k2w + v2w + 3; // 3 for each sep
+
+        // Left column gets remaining space
+        const leftW = Math.max(20, width - rightW);
+        const lk = 9; // label width
+
+        const lCol = [
+          [d("version"), a(`v${VERSION}  ${provider}`)],
+          [d("model"),   a(model)],
+          [d("think"),   a(thinking)],
+          [d(""),        d("")],
+          [d(""),        d("")],
         ];
 
         const lines: string[] = [""];
-        for (const [k0, v0, k1, v1, k2, v2] of rows) {
-          const line = pad(k0, c0) + pad(v0, c1) + sep + pad(k1, c2) + pad(v1, c3) + sep + pad(k2, c4) + v2;
-          lines.push(t(line));
+        for (let i = 0; i < 5; i++) {
+          const [lk0, lv0] = lCol[i];
+          const [rk0, rv0, rk1, rv1] = rCol[i];
+          const left = truncateToWidth(pad(lk0, lk) + lv0, leftW);
+          const right = pad(rk0, k1w) + pad(rv0, v1w) + sep + pad(rk1, k2w) + rv1;
+          lines.push(t(pad(left, leftW) + sep + right));
         }
 
-        // Prompts and skills below the table
-        if (prompts) lines.push(t(`${pad(d("prompts"), c0)}${a(prompts)}`));
-        if (skills) lines.push(t(`${pad(d("skills"), c0)}${a(skills)}`));
+        if (prompts) lines.push(t(`${pad(d("prompts"), lk)}${a(prompts)}`));
+        if (skills) lines.push(t(`${pad(d("skills"), lk)}${a(skills)}`));
         lines.push(d("─".repeat(width)));
 
         return lines;
