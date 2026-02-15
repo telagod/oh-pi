@@ -19,6 +19,9 @@ export const DEFAULT_ANT_CONFIGS: Record<AntCaste, Omit<AntConfig, "systemPrompt
   soldier: { caste: "soldier", model: "claude-sonnet-4-5",  tools: ["read", "bash", "grep", "find", "ls"], maxTurns: 8 },
 };
 
+/** Per-caste model overrides from user config */
+export type ModelOverrides = Partial<Record<AntCaste, string>>;
+
 // ═══ 任务 (Food Source) ═══
 export type TaskStatus = "pending" | "claimed" | "active" | "done" | "failed" | "blocked";
 export type TaskPriority = 1 | 2 | 3 | 4 | 5; // 1=highest
@@ -79,12 +82,14 @@ export interface Ant {
 export interface ColonyState {
   id: string;
   goal: string;
-  status: "scouting" | "working" | "reviewing" | "done" | "failed";
+  status: "scouting" | "working" | "reviewing" | "done" | "failed" | "budget_exceeded";
   tasks: Task[];
   ants: Ant[];
   pheromones: Pheromone[];
   concurrency: ConcurrencyConfig;
   metrics: ColonyMetrics;
+  maxCost: number | null;       // cost budget in USD, null = unlimited
+  modelOverrides: ModelOverrides;
   createdAt: number;
   finishedAt: number | null;
 }

@@ -37,7 +37,7 @@ function formatTokens(n: number): string {
 function statusIcon(status: string): string {
   const icons: Record<string, string> = {
     scouting: "🔍", working: "⚒️", reviewing: "🛡️",
-    done: "✅", failed: "❌",
+    done: "✅", failed: "❌", budget_exceeded: "💰",
   };
   return icons[status] || "🐜";
 }
@@ -79,10 +79,19 @@ For simple single-file tasks, work directly without the colony.`,
     parameters: Type.Object({
       goal: Type.String({ description: "What the colony should accomplish" }),
       maxAnts: Type.Optional(Type.Number({ description: "Max concurrent ants (default: auto-adapt)", minimum: 1, maximum: 8 })),
+      maxCost: Type.Optional(Type.Number({ description: "Max cost budget in USD (default: unlimited)", minimum: 0.01 })),
     }),
 
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const details: ColonyDetails = { state: null, phase: "initializing", log: [] };
+
+      // Resolve models: use current session model for worker/soldier, find a cheap model for scout
+      const currentModel = ctx.model?.id;
+      const modelOverrides: Record<string, string> = {};
+      if (currentModel) {
+        modelOverrides.worker = currentModel;
+        modelOverrides.soldier = currentModel;
+      }
 
       const emit = () => {
         const summary = details.state
@@ -126,6 +135,8 @@ For simple single-file tasks, work directly without the colony.`,
           cwd: ctx.cwd,
           goal: params.goal,
           maxAnts: params.maxAnts,
+          maxCost: params.maxCost,
+          modelOverrides,
           signal: signal ?? undefined,
           callbacks,
         });
@@ -140,6 +151,7 @@ For simple single-file tasks, work directly without the colony.`,
           `**Goal:** ${state.goal}`,
           `**Status:** ${statusIcon(state.status)} ${state.status}`,
           `**Duration:** ${elapsed}`,
+          ...(state.maxCost != null ? [`**Budget:** ${formatCost(m.totalCost)} / ${formatCost(state.maxCost)}`] : []),
           ``,
           `### Metrics`,
           `- Tasks: ${m.tasksDone}/${m.tasksTotal} done, ${m.tasksFailed} failed`,
@@ -165,7 +177,7 @@ For simple single-file tasks, work directly without the colony.`,
         return {
           content: [{ type: "text", text: report }],
           details: { ...details },
-          isError: state.status === "failed",
+          isError: state.status === "failed" || state.status === "budget_exceeded",
         };
       } catch (e) {
         return {
@@ -184,6 +196,7 @@ For simple single-file tasks, work directly without the colony.`,
       const goal = args.goal?.length > 60 ? args.goal.slice(0, 57) + "..." : args.goal;
       text += "\n  " + theme.fg("dim", goal || "...");
       if (args.maxAnts) text += theme.fg("muted", ` (max: ${args.maxAnts})`);
+      if (args.maxCost) text += theme.fg("warning", ` (budget: $${args.maxCost})`);
       return new Text(text, 0, 0);
     },
 
