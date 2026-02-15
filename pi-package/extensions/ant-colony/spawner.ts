@@ -114,8 +114,11 @@ Output format (MUST follow exactly):
 PASS or FAIL with summary.`,
 };
 
-function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string): string {
+function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, maxTurns?: number): string {
   let prompt = castePrompt + "\n\n";
+  if (maxTurns) {
+    prompt += `## ⚠️ Turn Limit\nYou have a MAXIMUM of ${maxTurns} turns. Plan accordingly — reserve your LAST turn to output the structured result format above. Do NOT waste turns on unnecessary exploration.\n\n`;
+  }
   if (pheromoneContext) {
     prompt += `## Colony Pheromone Trail (intelligence from other ants)\n${pheromoneContext}\n\n`;
   }
@@ -223,7 +226,7 @@ export async function spawnAnt(
   // 构建 prompt
   const pheromoneCtx = nest.getPheromoneContext(task.files);
   const castePrompt = CASTE_PROMPTS[antConfig.caste];
-  const fullPrompt = buildPrompt(task, pheromoneCtx, castePrompt);
+  const fullPrompt = buildPrompt(task, pheromoneCtx, castePrompt, antConfig.maxTurns);
   const tmpFile = writePromptFile(nest.dir, antId, fullPrompt);
 
   const args = [
@@ -246,6 +249,7 @@ export async function spawnAnt(
       nest.updateAnt(ant);
 
       let buffer = "";
+      let turnCount = 0;
 
       proc.stdout.on("data", (data) => {
         buffer += data.toString();
@@ -255,6 +259,15 @@ export async function spawnAnt(
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
+            if (event.type === "turn_end") {
+              turnCount++;
+              if (antConfig.maxTurns && turnCount === antConfig.maxTurns) {
+                stderr += `[ant-colony] Warning: ant reached maxTurns (${antConfig.maxTurns}), 1 grace turn remaining\n`;
+              } else if (antConfig.maxTurns && turnCount > antConfig.maxTurns) {
+                proc.kill("SIGTERM");
+                setTimeout(() => { if (!proc.killed) proc.kill("SIGKILL"); }, 3000);
+              }
+            }
             if (event.type === "message_end" && event.message) {
               messages.push(event.message);
               if (event.message.role === "assistant") {

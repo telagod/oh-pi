@@ -140,14 +140,13 @@ interface WaveOptions {
   currentModel: string;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
-  maxCost?: number;
 }
 
 /**
  * 并发执行一批蚂蚁，自适应调节并发度
  */
-async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> {
-  const { nest, cwd, caste, signal, callbacks, maxCost, currentModel } = opts;
+async function runAntWave(opts: WaveOptions): Promise<"ok"> {
+  const { nest, cwd, caste, signal, callbacks, currentModel } = opts;
   const config = { ...DEFAULT_ANT_CONFIGS[caste], model: currentModel };
 
   let backoffMs = 0; // 429 退避时间
@@ -208,26 +207,6 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget_exceeded"> 
   // 调度循环：持续派蚂蚁直到没有待处理任务
   let lastSampleTime = 0;
   while (!signal?.aborted) {
-    // 预算检查：派蚂蚁前预估，基于已完成蚂蚁的平均 cost
-    if (maxCost != null) {
-      const ants = nest.getState().ants;
-      const currentCost = ants.reduce((s, a) => s + a.usage.cost, 0);
-      if (currentCost >= maxCost) {
-        callbacks.onPhase("working", `Budget exceeded ($${currentCost.toFixed(3)} >= $${maxCost.toFixed(2)}). Stopping.`);
-        return "budget_exceeded";
-      }
-      // 预估：如果剩余预算不够一只蚂蚁的平均花费，也停止
-      const doneAnts = ants.filter(a => a.status === "done" && a.usage.cost > 0);
-      if (doneAnts.length > 0) {
-        const avgCost = doneAnts.reduce((s, a) => s + a.usage.cost, 0) / doneAnts.length;
-        const remaining = maxCost - currentCost;
-        if (remaining < avgCost * 0.5) {
-          callbacks.onPhase("working", `Budget nearly exhausted ($${currentCost.toFixed(3)}, avg/ant: $${avgCost.toFixed(3)}). Stopping.`);
-          return "budget_exceeded";
-        }
-      }
-    }
-
     const state = nest.getState();
     const pending = state.tasks.filter(t => t.status === "pending" && t.caste === caste);
     if (pending.length === 0) break;
@@ -331,7 +310,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   const { signal, callbacks } = opts;
   const waveBase: Omit<WaveOptions, "caste"> = {
     nest, cwd: opts.cwd, signal, callbacks,
-    maxCost: opts.maxCost, currentModel: opts.currentModel,
+    currentModel: opts.currentModel,
   };
 
   const cleanup = () => {
@@ -341,15 +320,6 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       const entries = fs.readdirSync(parentDir);
       if (entries.length === 0) fs.rmdirSync(parentDir);
     } catch { /* ignore */ }
-  };
-
-  const budgetStop = (phase: string) => {
-    nest.updateState({ status: "budget_exceeded", finishedAt: Date.now() });
-    callbacks.onPhase("budget_exceeded" as any, phase);
-    const s = nest.getState();
-    callbacks.onComplete(s);
-    cleanup();
-    return s;
   };
 
   try {
@@ -363,8 +333,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
         ? "Dispatching scout ants to explore codebase..."
         : `Scout retry ${scoutAttempt}/${MAX_SCOUT_RETRIES}...`);
 
-      if (await runAntWave({ ...waveBase, caste: "scout" }) === "budget_exceeded")
-        return budgetStop("Budget exceeded during scouting");
+      await runAntWave({ ...waveBase, caste: "scout" });
 
       workerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
       if (workerTasks.length > 0) break;
@@ -389,8 +358,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     // ═══ Phase 2: 工作 ═══
     nest.updateState({ status: "working" });
     callbacks.onPhase("working", `${workerTasks.length} tasks discovered. Dispatching worker ants...`);
-    if (await runAntWave({ ...waveBase, caste: "worker" }) === "budget_exceeded")
-      return budgetStop("Budget exceeded during working");
+    await runAntWave({ ...waveBase, caste: "worker" });
 
     // 处理工蚁产生的子任务（可能有多轮）
     let rounds = 0;
@@ -401,8 +369,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       if (remaining.length === 0) break;
       rounds++;
       callbacks.onPhase("working", `Round ${rounds + 1}: ${remaining.length} sub-tasks from workers...`);
-      if (await runAntWave({ ...waveBase, caste: "worker" }) === "budget_exceeded")
-        return budgetStop("Budget exceeded during sub-tasks");
+      await runAntWave({ ...waveBase, caste: "worker" });
     }
 
     // ═══ Phase 3: 审查 ═══
@@ -412,8 +379,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       callbacks.onPhase("reviewing", "Dispatching soldier ants to review changes...");
       const reviewTask = makeReviewTask(completedWorkerTasks);
       nest.writeTask(reviewTask);
-      if (await runAntWave({ ...waveBase, caste: "soldier" }) === "budget_exceeded")
-        return budgetStop("Budget exceeded during review");
+      await runAntWave({ ...waveBase, caste: "soldier" });
 
       // 兵蚁产生的修复任务
       const fixTasks = nest.getAllTasks().filter(t =>
@@ -422,8 +388,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       if (fixTasks.length > 0) {
         nest.updateState({ status: "working" });
         callbacks.onPhase("working", `${fixTasks.length} fix tasks from review. Dispatching workers...`);
-        if (await runAntWave({ ...waveBase, caste: "worker" }) === "budget_exceeded")
-          return budgetStop("Budget exceeded during fixes");
+        await runAntWave({ ...waveBase, caste: "worker" });
       }
     }
 
