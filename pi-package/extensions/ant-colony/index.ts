@@ -79,7 +79,19 @@ function phasePipeline(status: string, theme: any): string {
 export default function antColonyExtension(pi: ExtensionAPI) {
 
   // ═══ Auto-trigger: 注入蚁群意识，LLM 自动判断何时启动 ═══
-  pi.on("before_agent_start", async () => {
+  pi.on("before_agent_start", async (ctx) => {
+    // 获取可用模型列表
+    let modelList = "";
+    try {
+      const { execSync } = await import("node:child_process");
+      const output = execSync("pi --list-models 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
+      const models = output.trim().split("\n").slice(1) // skip header
+        .map(l => l.trim().split(/\s+/))
+        .filter(p => p.length >= 2)
+        .map(p => `${p[0]}/${p[1]}`);
+      if (models.length > 0) modelList = models.join(", ");
+    } catch { /* ignore */ }
+
     return {
       message: {
         customType: "ant-colony-context",
@@ -90,7 +102,17 @@ You have the ant_colony tool. Use it automatically when:
 - Task is complex enough that serial execution is inefficient
 
 Do NOT ask for confirmation. Call ant_colony directly with a clear goal.
-For simple single-file tasks, work directly without the colony.`,
+For simple single-file tasks, work directly without the colony.
+${modelList ? `
+[COLONY MODEL SELECTION]
+Available models: ${modelList}
+
+Strategy for choosing per-caste models:
+- scoutModel: Use a fast/cheap model (e.g. haiku, flash, gpt-4o-mini). Scouts only read, no edits.
+- workerModel: Use a capable model (e.g. sonnet, opus, gpt-4o). Workers make code changes.
+- soldierModel: Use same as worker or slightly cheaper. Soldiers review but don't edit.
+- If unsure, omit all three — defaults to current session model.
+- Prefer latest model versions for best quality.` : ""}`,
         display: false,
       },
     };
