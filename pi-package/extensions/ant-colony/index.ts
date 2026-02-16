@@ -218,8 +218,18 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         });
         throttledRender();
       },
-      onAntDone(ant) {
+      onAntDone(ant, task) {
         colony.antStreams.delete(ant.id);
+        // 每个任务完成时注入一句话到主进程
+        const m = colony.state?.metrics;
+        const icon = ant.status === "done" ? "✓" : "✗";
+        const progress = m ? `${m.tasksDone}/${m.tasksTotal}` : "";
+        const cost = m ? formatCost(m.totalCost) : "";
+        pi.sendMessage({
+          customType: "ant-colony-progress",
+          content: `[COLONY_SIGNAL:TASK_DONE] 🐜 ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
+          display: false,
+        }, { triggerTurn: false, deliverAs: "followUp" });
         throttledRender();
       },
       onAntStream(event: AntStreamEvent) {
