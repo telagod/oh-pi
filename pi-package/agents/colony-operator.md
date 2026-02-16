@@ -16,7 +16,7 @@ You command an autonomous ant colony. Complex tasks are delegated to the swarm, 
 
 ## Workflow
 1. Assess task scope
-2. If colony-worthy → use `ant_colony` tool with clear goal
+2. If colony-worthy → use `/colony <goal>` command with clear goal
 3. If simple → do it directly
 4. Review colony output, fix gaps manually if needed
 

@@ -334,152 +334,9 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     });
   }
 
-  // ═══ Auto-trigger: 注入蚁群意识 ═══
-  pi.on("before_agent_start", async () => {
-    let modelList = "";
-    try {
-      const { execSync } = await import("node:child_process");
-      const output = execSync("pi --list-models 2>/dev/null", { encoding: "utf-8", timeout: 5000 });
-      const models = output.trim().split("\n").slice(1)
-        .map(l => l.trim().split(/\s+/))
-        .filter(p => p.length >= 2)
-        .map(p => `${p[0]}/${p[1]}`);
-      if (models.length > 0) modelList = models.join(", ");
-    } catch { /* ignore */ }
 
-    const colonyStatus = activeColony
-      ? `\n[COLONY_SIGNAL:RUNNING] A colony is currently running in the background for goal: "${activeColony.goal.slice(0, 100)}". Do NOT launch another colony. Do NOT check progress or assume failure. You will receive [COLONY_SIGNAL:COMPLETE] automatically when it finishes. If the user asks about colony status, tell them it's still running. Use /colony-stop to cancel.`
-      : "";
 
-    return {
-      message: {
-        customType: "ant-colony-context",
-        content: `[ANT COLONY AVAILABLE]
-You have the ant_colony tool. Use it automatically when:
-- Task involves ≥3 files
-- Task needs parallel workstreams (refactor, migration, feature across modules)
-- Task is complex enough that serial execution is inefficient
 
-Do NOT ask for confirmation. Call ant_colony directly with a clear goal.
-For simple single-file tasks, work directly without the colony.
-
-[COLONY SIGNAL PROTOCOL]
-The colony communicates via signals. You MUST obey these:
-- [COLONY_SIGNAL:LAUNCHED] — Colony started. Do NOT poll, check, or assume failure. Wait for completion signal.
-- [COLONY_SIGNAL:RUNNING] — Colony is active. Do NOT launch another or check progress.
-- [COLONY_SIGNAL:COMPLETE] — Colony finished. Review the report and summarize results to the user.
-- [COLONY_SIGNAL:FAILED] — Colony crashed. Report the error to the user.
-
-After launching a colony, your ONLY correct behavior is:
-1. Tell the user the colony is running
-2. Continue chatting about OTHER topics if the user asks
-3. Wait for [COLONY_SIGNAL:COMPLETE] or [COLONY_SIGNAL:FAILED] — do NOT guess the outcome
-${modelList ? `
-[COLONY MODEL SELECTION]
-Available models: ${modelList}
-
-Strategy for choosing per-caste models:
-- scoutModel: Use a fast/cheap model (e.g. haiku, flash, gpt-4o-mini). Scouts only read, no edits.
-- workerModel: Use a capable model (e.g. sonnet, opus, gpt-4o). Workers make code changes.
-- soldierModel: Use same as worker or slightly cheaper. Soldiers review but don't edit.
-- If unsure, omit all three — defaults to current session model.
-- Prefer latest model versions for best quality.` : ""}${colonyStatus}`,
-        display: false,
-      },
-    };
-  });
-
-  // ═══ Tool: ant_colony (non-blocking) ═══
-  pi.registerTool({
-    name: "ant_colony",
-    label: "Ant Colony",
-    description: [
-      "Launch an autonomous ant colony in the BACKGROUND to accomplish a complex goal.",
-      "The colony runs asynchronously — you can continue chatting while it works.",
-      "Results are automatically injected when the colony finishes.",
-      "Scouts explore the codebase, workers execute tasks in parallel, soldiers review quality.",
-      "Use for multi-file changes, large refactors, or complex features.",
-    ].join(" "),
-    parameters: Type.Object({
-      goal: Type.String({ description: "What the colony should accomplish" }),
-      maxAnts: Type.Optional(Type.Number({ description: "Max concurrent ants (default: auto-adapt)", minimum: 1, maximum: 8 })),
-      maxCost: Type.Optional(Type.Number({ description: "Max cost budget in USD (default: unlimited)", minimum: 0.01 })),
-      scoutModel: Type.Optional(Type.String({ description: "Model for scout ants (default: current session model)" })),
-      workerModel: Type.Optional(Type.String({ description: "Model for worker ants (default: current session model)" })),
-      soldierModel: Type.Optional(Type.String({ description: "Model for soldier ants (default: current session model)" })),
-    }),
-
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      if (activeColony) {
-        return {
-          content: [{ type: "text", text: "A colony is already running in the background. Use /colony-stop to cancel it first." }],
-          isError: true,
-        };
-      }
-
-      const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
-      if (!currentModel) {
-        return {
-          content: [{ type: "text", text: "Colony failed: no model available in current session" }],
-          isError: true,
-        };
-      }
-
-      const modelOverrides: Record<string, string> = {};
-      if (params.scoutModel) modelOverrides.scout = params.scoutModel;
-      if (params.workerModel) modelOverrides.worker = params.workerModel;
-      if (params.soldierModel) modelOverrides.soldier = params.soldierModel;
-
-      const colonyParams = {
-        goal: params.goal,
-        maxAnts: params.maxAnts,
-        maxCost: params.maxCost,
-        currentModel,
-        modelOverrides,
-        cwd: ctx.cwd,
-        modelRegistry: ctx.modelRegistry ?? undefined,
-      };
-
-      // 非交互模式（print mode）：同步等待蚁群完成
-      if (!ctx.hasUI) {
-        return await runSyncColony(colonyParams, _signal);
-      }
-
-      // 交互模式：后台运行
-      launchBackgroundColony(colonyParams);
-
-      return {
-        content: [{ type: "text", text: `[COLONY_SIGNAL:LAUNCHED]\n🐜 Colony launched in background.\nGoal: ${params.goal}\n\n⚠️ IMPORTANT: The colony is now running autonomously. Do NOT check progress, do NOT ask about status, do NOT assume failure. You will receive a [COLONY_SIGNAL:COMPLETE] message automatically when it finishes. Continue chatting about other topics or wait silently.` }],
-      };
-    },
-
-    renderCall(args, theme) {
-      const goal = args.goal?.length > 70 ? args.goal.slice(0, 67) + "..." : args.goal;
-      let text = theme.fg("toolTitle", theme.bold("🐜 ant_colony"));
-      if (args.maxAnts) text += theme.fg("muted", ` ×${args.maxAnts}`);
-      if (args.maxCost) text += theme.fg("warning", ` $${args.maxCost}`);
-      text += "\n" + theme.fg("dim", `  ${goal || "..."}`);
-      return new Text(text, 0, 0);
-    },
-
-    renderResult(result, { expanded }, theme) {
-      // 后台模式：tool result 只是启动确认
-      const text = result.content?.find((c: any) => c.type === "text")?.text || "";
-      if (result.isError) {
-        return new Text(theme.fg("error", text), 0, 0);
-      }
-      const container = new Container();
-      container.addChild(new Text(
-        theme.fg("success", "✓ ") + theme.fg("toolTitle", theme.bold("Colony launched in background")),
-        0, 0,
-      ));
-      if (activeColony) {
-        container.addChild(new Text(theme.fg("dim", `  Goal: ${activeColony.goal.slice(0, 70)}`), 0, 0));
-        container.addChild(new Text(theme.fg("muted", `  Ctrl+Shift+A for details │ /colony-stop to cancel`), 0, 0));
-      }
-      return container;
-    },
-  });
 
   // ═══ Custom message renderer for colony reports ═══
   pi.registerMessageRenderer("ant-colony-report", (message, theme) => {
@@ -607,6 +464,40 @@ Strategy for choosing per-caste models:
           },
         };
       }, { overlay: true, overlayOptions: { anchor: "center", width: "80%", maxHeight: "80%" } });
+    },
+  });
+
+  // ═══ Command: /colony ═══
+  pi.registerCommand("colony", {
+    description: "Launch an ant colony with a goal",
+    parameters: Type.Object({
+      goal: Type.String({ description: "What the colony should accomplish" }),
+    }),
+    async handler(args, ctx) {
+      const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
+      if (!currentModel) {
+        ctx.ui.notify("No model available in current session", "error");
+        return;
+      }
+
+      const colonyParams = {
+        goal: args.goal,
+        currentModel,
+        modelOverrides: {},
+        cwd: ctx.cwd,
+        modelRegistry: ctx.modelRegistry ?? undefined,
+      };
+
+      if (!ctx.hasUI) {
+        const result = await runSyncColony(colonyParams);
+        if (result.isError) {
+          ctx.ui.notify("Colony failed", "error");
+        }
+        return;
+      }
+
+      launchBackgroundColony(colonyParams);
+      ctx.ui.notify(`🐜 Colony launched: ${args.goal.slice(0, 50)}`, "success");
     },
   });
 
