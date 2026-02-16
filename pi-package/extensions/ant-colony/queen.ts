@@ -169,16 +169,11 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
   const retriedTasks = new Set<string>(); // 防止重复重试
 
   const runOne = async (): Promise<"done" | "empty" | "rate_limited" | "budget"> => {
-    // Budget 刹车：剩余预算不够一只蚂蚁的预估成本就不出发
+    // Budget 刹车：预算用完就不出发（drone 免费，不检查）
     const state = nest.getState();
     if (state.maxCost != null && caste !== "drone") {
       const spent = state.ants.reduce((s, a) => s + a.usage.cost, 0);
-      const remaining = state.maxCost - spent;
-      const doneAnts = state.ants.filter(a => a.status === "done" && a.usage.cost > 0);
-      const avgCost = doneAnts.length > 0
-        ? doneAnts.reduce((s, a) => s + a.usage.cost, 0) / doneAnts.length
-        : 0.05;
-      if (remaining < avgCost * 1.5) return "budget";
+      if (spent >= state.maxCost) return "budget";
     }
 
     const task = nest.nextPendingTask(caste);
