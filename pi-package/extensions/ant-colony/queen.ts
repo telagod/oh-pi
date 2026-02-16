@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { DEFAULT_ANT_CONFIGS } from "./types.js";
 import { Nest } from "./nest.js";
-import { spawnAnt, makeTaskId } from "./spawner.js";
+import { spawnAnt, runDrone, makeTaskId } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
@@ -177,7 +177,9 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
     callbacks.onAntSpawn(ant, task);
 
     try {
-      const result = await spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
+      const result = caste === "drone"
+        ? await runDrone(cwd, nest, task)
+        : await spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
       callbacks.onAntDone(result.ant, task, result.output);
 
       if (result.rateLimited) {
@@ -344,7 +346,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     callbacks.onPhase("scouting", "Dispatching scout ant to explore codebase...");
     await runAntWave({ ...waveBase, caste: "scout" });
 
-    let workerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
+    let workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
 
     // 只在完全没有 worker 任务时才重试一次
     if (workerTasks.length === 0) {
@@ -372,7 +374,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       nest.writeTask(relayTask);
       callbacks.onPhase("scouting", "Scout relay: generating worker tasks...");
       await runAntWave({ ...waveBase, caste: "scout" });
-      workerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
+      workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
     }
 
     if (workerTasks.length === 0) {
@@ -384,12 +386,24 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 
     // ═══ Phase 2: 工作 ═══
     nest.updateState({ status: "working" });
+
+    // 先执行 drone 任务（零 LLM 成本）
+    const droneTasks = nest.getAllTasks().filter(t => t.caste === "drone" && t.status === "pending");
+    if (droneTasks.length > 0) {
+      callbacks.onPhase("working", `${droneTasks.length} drone tasks. Executing rules...`);
+      await runAntWave({ ...waveBase, caste: "drone" });
+    }
+
     callbacks.onPhase("working", `${workerTasks.length} tasks discovered. Dispatching worker ants...`);
     await runAntWave({ ...waveBase, caste: "worker" });
 
     // 处理工蚁产生的子任务（可能有多轮）
     let rounds = 0;
     while (rounds < 3) {
+      // 先跑 drone 子任务
+      const pendingDrones = nest.getAllTasks().filter(t => t.caste === "drone" && t.status === "pending");
+      if (pendingDrones.length > 0) await runAntWave({ ...waveBase, caste: "drone" });
+
       const remaining = nest.getAllTasks().filter(t =>
         t.caste === "worker" && (t.status === "pending" || t.status === "blocked")
       );

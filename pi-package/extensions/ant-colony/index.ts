@@ -43,7 +43,7 @@ function statusIcon(status: string): string {
 }
 
 function casteIcon(caste: string): string {
-  return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : "⚒️";
+  return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : caste === "drone" ? "⚙️" : "⚒️";
 }
 
 // ═══ Background colony state ═══

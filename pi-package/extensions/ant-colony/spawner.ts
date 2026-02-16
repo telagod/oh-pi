@@ -83,6 +83,8 @@ For each task the colony should do next:
 - priority: <1-5, 1=highest>
 - context: <relevant code snippets that the worker will need, with file:line references>
 
+Use caste "drone" instead of "worker" for simple tasks that can be done with a single bash command (file copy, find-replace, formatting, running tests). Drone description should be the exact bash command to execute.
+
 ## Warnings
 Any risks, blockers, or conflicts detected.`,
 
@@ -248,6 +250,49 @@ function makeMinimalResourceLoader(systemPrompt: string): ResourceLoader {
     extendResources: () => {},
     reload: async () => {},
   };
+}
+
+/**
+ * 运行 Drone — 纯规则执行，零 LLM 成本
+ * 任务描述即为要执行的 bash 命令
+ */
+export async function runDrone(
+  cwd: string,
+  nest: Nest,
+  task: Task,
+): Promise<AntResult> {
+  const antId = makeAntId("drone");
+  const ant: Ant = {
+    id: antId, caste: "drone", status: "working", taskId: task.id,
+    pid: null, model: "none",
+    usage: { input: 0, output: 0, cost: 0, turns: 1 },
+    startedAt: Date.now(), finishedAt: null,
+  };
+  nest.updateAnt(ant);
+  nest.updateTaskStatus(task.id, "active");
+
+  try {
+    const { execSync } = await import("node:child_process");
+    const cmd = task.description;
+    const output = execSync(cmd, { cwd, encoding: "utf-8", timeout: 30000, stdio: "pipe" }).trim();
+
+    ant.status = "done";
+    ant.finishedAt = Date.now();
+    nest.updateAnt(ant);
+    nest.updateTaskStatus(task.id, "done", `## Completed\n${output || "(no output)"}`);
+    nest.dropPheromone({
+      id: makePheromoneId(), type: "completion", antId, antCaste: "drone",
+      taskId: task.id, content: `Drone executed: ${cmd.slice(0, 100)}`, files: task.files, strength: 1, createdAt: Date.now(),
+    });
+    return { ant, output, newTasks: [], pheromones: [], rateLimited: false };
+  } catch (e: any) {
+    const errStr = e.stderr?.toString() || String(e);
+    ant.status = "failed";
+    ant.finishedAt = Date.now();
+    nest.updateAnt(ant);
+    nest.updateTaskStatus(task.id, "failed", undefined, errStr.slice(0, 500));
+    return { ant, output: errStr, newTasks: [], pheromones: [], rateLimited: false };
+  }
 }
 
 /**
