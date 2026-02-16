@@ -463,6 +463,37 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       }
     }
 
+    // ═══ 持续探索：Worker 完成后检查是否有新发现，有则再派 Scout ═══
+    const discoveries = nest.getAllPheromones().filter(p => p.type === "discovery");
+    const allDone = nest.getAllTasks().filter(t => t.status === "done");
+    if (discoveries.length > allDone.length && nest.getState().maxCost != null) {
+      const spent = nest.getState().ants.reduce((s, a) => s + a.usage.cost, 0);
+      if (spent < (nest.getState().maxCost ?? Infinity)) {
+        callbacks.onPhase?.("scouting", "Re-exploring based on new discoveries...");
+        emitSignal("scouting", "Re-exploring...");
+        await runAntWave({ ...waveBase, caste: "scout" });
+
+        const newTasks = nest.getAllTasks().filter(t =>
+          (t.caste === "worker" || t.caste === "drone") && t.status === "pending"
+        );
+        if (newTasks.length > 0) {
+          const drones = newTasks.filter(t => t.caste === "drone");
+          if (drones.length > 0) await runAntWave({ ...waveBase, caste: "drone" });
+
+          callbacks.onPhase?.("working", `${newTasks.length} new tasks from re-exploration`);
+          emitSignal("working", `${newTasks.length} new tasks`);
+          const result = await runAntWave({ ...waveBase, caste: "worker" });
+          if (result === "budget") {
+            nest.updateState({ status: "budget_exceeded", finishedAt: Date.now() });
+            emitSignal("budget_exceeded", "Budget exhausted");
+            const budgetState = nest.getState();
+            callbacks.onComplete?.(budgetState);
+            return budgetState;
+          }
+        }
+      }
+    }
+
     // ═══ Auto-check: run tsc before soldier review ═══
     let tscPassed = true;
     try {
