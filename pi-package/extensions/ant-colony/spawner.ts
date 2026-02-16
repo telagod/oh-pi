@@ -142,6 +142,9 @@ function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, 
   if (task.files.length > 0) {
     prompt += `**Files scope:** ${task.files.join(", ")}\n`;
   }
+  if (/[\u4e00-\u9fff]/.test(task.description)) {
+    prompt += '\nIMPORTANT: Follow the language requirements specified in the task description. If the task says to write in Chinese, write in Chinese.\n';
+  }
   return prompt;
 }
 

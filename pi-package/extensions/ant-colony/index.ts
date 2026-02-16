@@ -558,6 +558,75 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     },
   });
 
+  // ═══ Helper: build status summary ═══
+
+  function buildStatusText(): string {
+    if (!activeColony) return "No colony is currently running.";
+    const c = activeColony;
+    const state = c.state;
+    const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
+    const m = state?.metrics;
+    const tasks = state?.tasks || [];
+    const ants = state?.ants || [];
+    const streams = Array.from(c.antStreams.values());
+
+    const lines: string[] = [
+      `## 🐜 Colony Status`,
+      `**Goal:** ${c.goal}`,
+      `**Phase:** ${c.phase}`,
+      `**Duration:** ${elapsed}`,
+    ];
+
+    if (m) {
+      lines.push(`**Tasks:** ${m.tasksDone}/${m.tasksTotal} done, ${m.tasksFailed} failed`);
+      lines.push(`**Ants spawned:** ${m.antsSpawned} | **Active:** ${streams.length}`);
+      lines.push(`**Cost:** ${formatCost(m.totalCost)} | **Tokens:** ${formatTokens(m.totalTokens)}`);
+    }
+
+    if (tasks.length > 0) {
+      lines.push("", "### Tasks");
+      for (const t of tasks) {
+        const icon = t.status === "done" ? "✓" : t.status === "failed" ? "✗" : t.status === "active" ? "●" : "○";
+        const dur = t.finishedAt && t.startedAt ? ` (${formatDuration(t.finishedAt - t.startedAt)})` : "";
+        lines.push(`- ${icon} [${t.caste}] ${t.title}${dur}`);
+      }
+    }
+
+    if (streams.length > 0) {
+      lines.push("", "### Active Ants");
+      for (const s of streams) {
+        lines.push(`- ${casteIcon(s.caste)} ${s.antId.slice(0, 14)} | ${s.tokens}tok | ${s.lastLine.slice(0, 60)}`);
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  // ═══ Tool: bg_colony_status ═══
+  pi.registerTool({
+    name: "bg_colony_status",
+    label: "Colony Status",
+    description: "Check the status of a running background ant colony. Use this instead of bg_status to monitor colony progress.",
+    parameters: Type.Object({}),
+    async execute() {
+      return {
+        content: [{ type: "text" as const, text: buildStatusText() }],
+      };
+    },
+  });
+
+  // ═══ Command: /colony-status ═══
+  pi.registerCommand("colony-status", {
+    description: "Show current colony progress",
+    async handler(_args, ctx) {
+      if (!activeColony) {
+        ctx.ui.notify("No colony is currently running.", "info");
+        return;
+      }
+      ctx.ui.notify(buildStatusText(), "info");
+    },
+  });
+
   // ═══ Command: /colony-stop ═══
   pi.registerCommand("colony-stop", {
     description: "Stop the running background colony",

@@ -67,7 +67,7 @@ export function adapt(config: ConcurrencyConfig, pendingTasks: number): Concurre
   // 不超过待处理任务数
   const taskCap = Math.min(pendingTasks, config.max);
 
-  if (samples.length < 3) {
+  if (samples.length < 2) {
     // 冷启动：直接给一半 max，快速利用并发
     next.current = Math.min(Math.ceil(config.max / 2), taskCap);
     return next;
@@ -110,6 +110,11 @@ export function adapt(config: ConcurrencyConfig, pendingTasks: number): Concurre
     next.current = Math.max(config.min, config.optimal);
   }
   // 否则保持不变
+
+  // 429 recovery: restore to optimal when CPU is underutilized (e.g. after backoff)
+  if (latest.cpuLoad < 0.5 && next.current < config.optimal) {
+    next.current = config.optimal;
+  }
 
   return next;
 }

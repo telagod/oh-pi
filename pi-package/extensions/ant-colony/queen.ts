@@ -378,7 +378,6 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       nest.updateState({ status: "failed", finishedAt: Date.now() });
       const finalState = nest.getState();
       callbacks.onComplete(finalState);
-      cleanup();
       return finalState;
     }
 
@@ -424,14 +423,14 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     nest.updateState({ status: "done", finishedAt: Date.now(), metrics: finalMetrics });
     const finalState = nest.getState();
     callbacks.onComplete(finalState);
-    cleanup();
     return finalState;
 
   } catch (e) {
     nest.updateState({ status: "failed", finishedAt: Date.now() });
     const failState = nest.getState();
     callbacks.onComplete(failState);
-    cleanup();
     return failState;
+  } finally {
+    cleanup();
   }
 }

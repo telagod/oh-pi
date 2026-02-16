@@ -226,8 +226,8 @@ export class Nest {
   // ═══ Internal ═══
 
   private withStateLock<T>(fn: () => T): T {
-    const MAX_WAIT = 5000;
-    const SPIN_MS = 15;
+    const MAX_WAIT = 3000;
+    const SPIN_MS = 1;
     const start = Date.now();
     while (true) {
       try {
