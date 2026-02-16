@@ -28,7 +28,7 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
     `${t("confirm.theme")}      ${chalk.cyan(config.theme)}`,
     `${t("confirm.keybindings")}${chalk.cyan(config.keybindings)}`,
     `${t("confirm.thinking")}   ${chalk.cyan(config.thinking)}`,
-    `${t("confirm.compaction")} ${chalk.cyan(t("confirm.compactionValue", { pct: Math.round((config.compactThreshold ?? 0.75) * 100) }))}`,
+    `${t("confirm.compaction")} ${chalk.cyan("auto")}`,
     `${t("confirm.extensions")} ${chalk.cyan(config.extensions.join(", ") || t("confirm.none"))}`,
     `${t("confirm.prompts")}    ${chalk.cyan(t("confirm.promptsValue", { count: config.prompts.length }))}`,
     `${t("confirm.agents")}     ${chalk.cyan(config.agents)}`,

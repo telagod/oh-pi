@@ -89,14 +89,19 @@ export function applyConfig(config: OhPConfig) {
   const primary = config.providers.find(p => p.baseUrl && p.defaultModel) ?? config.providers[0];
   const providerInfo = primary ? PROVIDERS[primary.name] : undefined;
   const compactThreshold = config.compactThreshold ?? 0.75;
-  const reserveTokens = 32000;
+  // 根据主模型的 contextWindow 自动计算压缩参数
+  const primaryModelId = primary?.defaultModel ?? providerInfo?.models[0];
+  const caps = primaryModelId ? MODEL_CAPABILITIES[primaryModelId] : undefined;
+  const ctxWindow = caps?.contextWindow ?? primary?.contextWindow ?? 128000;
+  const reserveTokens = Math.max(16384, Math.round(ctxWindow * 0.15));
+  const keepRecentTokens = Math.max(16384, Math.round(ctxWindow * 0.15));
   const primaryModel = primary?.defaultModel ?? providerInfo?.models[0];
   const settings: Record<string, unknown> = {
     ...(primary ? { defaultProvider: primary.name, defaultModel: primaryModel } : {}),
     defaultThinkingLevel: config.thinking,
     theme: config.theme,
     enableSkillCommands: true,
-    compaction: { enabled: true, reserveTokens, keepRecentTokens: 20000 },
+    compaction: { enabled: true, reserveTokens, keepRecentTokens },
     retry: { enabled: true, maxRetries: 3 },
     quietStartup: true,
   };

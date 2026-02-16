@@ -77,28 +77,12 @@ async function customFlow(env: EnvInfo): Promise<OhPConfig> {
   const extensions = await selectExtensions();
   const agents = await selectAgents();
 
-  // Advanced: auto-compaction threshold
+  // Advanced: auto-compaction is now automatic based on model context window
   const wantAdvanced = await p.confirm({
     message: t("advanced.configure"),
     initialValue: false,
   });
   if (p.isCancel(wantAdvanced)) { p.cancel(t("cancelled")); process.exit(0); }
-
-  let compactThreshold = 0.80;
-  if (wantAdvanced) {
-    const threshold = await p.text({
-      message: t("advanced.compactThreshold"),
-      placeholder: "75",
-      initialValue: "75",
-      validate: (v) => {
-        const n = Number(v);
-        if (isNaN(n) || n < 10 || n > 100) return t("advanced.compactValidation");
-        return undefined;
-      },
-    });
-    if (p.isCancel(threshold)) { p.cancel(t("cancelled")); process.exit(0); }
-    compactThreshold = Number(threshold) / 100;
-  }
 
   return {
     providers,
@@ -108,6 +92,5 @@ async function customFlow(env: EnvInfo): Promise<OhPConfig> {
     prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "security", "document", "pr"],
     agents,
     thinking: "medium",
-    compactThreshold,
   };
 }
