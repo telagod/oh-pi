@@ -290,6 +290,9 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
  * 蚁后主循环
  */
 export async function runColony(opts: QueenOptions): Promise<ColonyState> {
+  if (!opts.goal || !opts.goal.trim()) {
+    throw new Error("Colony goal is empty or undefined. Please provide a clear goal.");
+  }
   const colonyId = makeColonyId();
   const nest = new Nest(opts.cwd, colonyId);
 
