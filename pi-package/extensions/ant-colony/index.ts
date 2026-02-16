@@ -191,9 +191,21 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       promise: null as any, // set below
     };
 
+    let lastPhase = "";
+
     const callbacks: QueenCallbacks = {
       onSignal(signal) {
         colony.phase = signal.message;
+        // 阶段切换时注入消息到主进程对话流
+        if (signal.phase !== lastPhase) {
+          lastPhase = signal.phase;
+          const pct = Math.round(signal.progress * 100);
+          pi.sendMessage({
+            customType: "ant-colony-progress",
+            content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] 🐜 ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
+            display: false,
+          }, { triggerTurn: false, deliverAs: "followUp" });
+        }
         throttledRender();
       },
       onPhase(phase, detail) {
