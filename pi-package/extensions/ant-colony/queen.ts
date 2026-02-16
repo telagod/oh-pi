@@ -159,7 +159,7 @@ interface WaveOptions {
 /**
  * 并发执行一批蚂蚁，自适应调节并发度
  */
-async function runAntWave(opts: WaveOptions): Promise<"ok"> {
+async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
   const { nest, cwd, caste, signal, callbacks, currentModel } = opts;
   const casteModel = opts.modelOverrides?.[caste] || currentModel;
   const config = { ...DEFAULT_ANT_CONFIGS[caste], model: casteModel };
@@ -168,7 +168,19 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
   let consecutiveRateLimits = 0; // 连续限流计数
   const retriedTasks = new Set<string>(); // 防止重复重试
 
-  const runOne = async (): Promise<"done" | "empty" | "rate_limited"> => {
+  const runOne = async (): Promise<"done" | "empty" | "rate_limited" | "budget"> => {
+    // Budget 刹车：剩余预算不够一只蚂蚁的预估成本就不出发
+    const state = nest.getState();
+    if (state.maxCost != null && caste !== "drone") {
+      const spent = state.ants.reduce((s, a) => s + a.usage.cost, 0);
+      const remaining = state.maxCost - spent;
+      const doneAnts = state.ants.filter(a => a.status === "done" && a.usage.cost > 0);
+      const avgCost = doneAnts.length > 0
+        ? doneAnts.reduce((s, a) => s + a.usage.cost, 0) / doneAnts.length
+        : 0.05;
+      if (remaining < avgCost * 1.5) return "budget";
+    }
+
     const task = nest.nextPendingTask(caste);
     if (!task) return "empty";
     if (!nest.claimTask(task.id, "queen")) return "empty";
@@ -280,11 +292,15 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
     }
 
     const batch = Math.min(slotsAvailable, pending.length);
-    const promises: Promise<"done" | "empty" | "rate_limited">[] = [];
+    const promises: Promise<"done" | "empty" | "rate_limited" | "budget">[] = [];
     for (let i = 0; i < batch; i++) {
       promises.push(runOne());
     }
     const results = await Promise.all(promises);
+
+    if (results.includes("budget")) {
+      return "budget";
+    }
 
     // 429 处理：降低并发 + 渐进退避（2s → 5s → 10s，上限 10s）
     if (results.includes("rate_limited")) {
@@ -431,9 +447,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     emitSignal("working", `${workerTasks.length} tasks to do`);
     await runAntWave({ ...waveBase, caste: "worker" });
 
-    // 处理工蚁产生的子任务（可能有多轮）
-    let rounds = 0;
-    while (rounds < 3) {
+    // 处理工蚁产生的子任务（budget 驱动，无硬限制）
+    while (true) {
       // 先跑 drone 子任务
       const pendingDrones = nest.getAllTasks().filter(t => t.caste === "drone" && t.status === "pending");
       if (pendingDrones.length > 0) await runAntWave({ ...waveBase, caste: "drone" });
@@ -442,9 +457,15 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
         t.caste === "worker" && (t.status === "pending" || t.status === "blocked")
       );
       if (remaining.length === 0) break;
-      rounds++;
-      callbacks.onPhase?.("working", `Round ${rounds + 1}: ${remaining.length} sub-tasks from workers...`);
-      await runAntWave({ ...waveBase, caste: "worker" });
+      callbacks.onPhase?.("working", `${remaining.length} sub-tasks from workers...`);
+      const result = await runAntWave({ ...waveBase, caste: "worker" });
+      if (result === "budget") {
+        nest.updateState({ status: "budget_exceeded", finishedAt: Date.now() });
+        emitSignal("budget_exceeded", "Budget exhausted");
+        const budgetState = nest.getState();
+        callbacks.onComplete?.(budgetState);
+        return budgetState;
+      }
     }
 
     // ═══ Auto-check: run tsc before soldier review ═══
