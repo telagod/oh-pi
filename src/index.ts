@@ -47,7 +47,7 @@ async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
     providers,
     theme: "dark",
     keybindings: "default",
-    extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
+    extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update", "smart-compact"],
     prompts: ["review", "fix", "explain", "commit", "test"],
     agents: "general-developer",
     thinking: "medium",
