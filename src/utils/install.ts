@@ -15,12 +15,36 @@ function ensureDir(dir: string) {
 }
 
 /**
- * 清空并重建目录，若目录已存在则先删除再重新创建
- * @param dir - 目标目录路径
+ * 增量同步目录：只复制有变化的文件，删除源中不存在的文件
+ * @param src - 源目录路径
+ * @param dest - 目标目录路径
  */
-function cleanDir(dir: string) {
-  if (existsSync(dir)) rmSync(dir, { recursive: true });
-  ensureDir(dir);
+function syncDir(src: string, dest: string) {
+  ensureDir(dest);
+  const srcEntries = new Set<string>();
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    srcEntries.add(entry.name);
+    const srcPath = join(src, entry.name);
+    const destPath = join(dest, entry.name);
+    if (entry.isDirectory()) {
+      syncDir(srcPath, destPath);
+    } else {
+      // 只在文件大小不同时复制
+      try {
+        if (existsSync(destPath) && statSync(destPath).size === statSync(srcPath).size) continue;
+      } catch { /* copy anyway */ }
+      copyFileSync(srcPath, destPath);
+    }
+  }
+  // 删除目标中源不存在的文件
+  try {
+    for (const entry of readdirSync(dest, { withFileTypes: true })) {
+      if (!srcEntries.has(entry.name)) {
+        const p = join(dest, entry.name);
+        rmSync(p, { recursive: true });
+      }
+    }
+  } catch { /* skip */ }
 }
 
 /**
@@ -153,12 +177,12 @@ export function applyConfig(config: OhPConfig) {
 
   // 6. Copy extensions (single file .ts or directory with index.ts)
   const extDir = join(agentDir, "extensions");
-  cleanDir(extDir);
+  ensureDir(extDir);
   for (const ext of config.extensions) {
     const dirSrc = resources.extension(ext);
     const fileSrc = resources.extensionFile(ext);
     if (existsSync(dirSrc) && statSync(dirSrc).isDirectory()) {
-      copyDir(dirSrc, join(extDir, ext));
+      syncDir(dirSrc, join(extDir, ext));
     } else {
       try { copyFileSync(fileSrc, join(extDir, `${ext}.ts`)); } catch { /* skip */ }
     }
@@ -166,7 +190,7 @@ export function applyConfig(config: OhPConfig) {
 
   // 7. Copy prompts
   const promptDir = join(agentDir, "prompts");
-  cleanDir(promptDir);
+  ensureDir(promptDir);
   for (const p of config.prompts) {
     const src = resources.prompt(p);
     try { copyFileSync(src, join(promptDir, `${p}.md`)); } catch { /* skip */ }
@@ -174,19 +198,14 @@ export function applyConfig(config: OhPConfig) {
 
   // 8. Copy skills (auto-discover all from pi-package/skills/)
   const skillDir = join(agentDir, "skills");
-  cleanDir(skillDir);
   const skillsSrcDir = resources.skillsDir();
   try {
-    for (const entry of readdirSync(skillsSrcDir, { withFileTypes: true })) {
-      if (entry.isDirectory() && existsSync(join(skillsSrcDir, entry.name, "SKILL.md"))) {
-        copyDir(join(skillsSrcDir, entry.name), join(skillDir, entry.name));
-      }
-    }
+    if (existsSync(skillsSrcDir)) syncDir(skillsSrcDir, skillDir);
   } catch { /* skills dir not found, skip */ }
 
   // 9. Copy themes (only custom ones)
   const themeDir = join(agentDir, "themes");
-  cleanDir(themeDir);
+  ensureDir(themeDir);
   const themeSrc = resources.theme(config.theme);
   try { copyFileSync(themeSrc, join(themeDir, `${config.theme}.json`)); } catch { /* built-in theme */ }
 }
@@ -196,7 +215,7 @@ export function applyConfig(config: OhPConfig) {
  */
 export function installPi() {
   try {
-    execSync("npm install -g @mariozechner/pi-coding-agent", { stdio: "inherit" });
+    execSync("npm install -g @mariozechner/pi-coding-agent", { stdio: "pipe", timeout: 120000 });
   } catch {
     throw new Error("Failed to install pi-coding-agent");
   }

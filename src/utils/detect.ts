@@ -86,19 +86,21 @@ function detectProviders(agentDir: string): string[] {
  */
 export async function detectEnv(): Promise<EnvInfo> {
   const agentDir = join(homedir(), ".pi", "agent");
-  let piVersion: string | null = null;
-  let piInstalled = false;
 
-  try {
-    piVersion = execSync("pi --version", { encoding: "utf8", timeout: 5000 }).trim();
-    piInstalled = true;
-  } catch { /* not installed */ }
-
-  const existingFiles = scanDir(agentDir);
+  // 并行检测 pi 版本和扫描配置
+  const [versionResult, existingFiles] = await Promise.all([
+    new Promise<{ installed: boolean; version: string | null }>((resolve) => {
+      try {
+        const v = execSync("pi --version", { encoding: "utf8", timeout: 3000 }).trim();
+        resolve({ installed: true, version: v });
+      } catch { resolve({ installed: false, version: null }); }
+    }),
+    Promise.resolve(scanDir(agentDir)),
+  ]);
 
   return {
-    piInstalled,
-    piVersion,
+    piInstalled: versionResult.installed,
+    piVersion: versionResult.version,
     hasExistingConfig: existsSync(join(agentDir, "settings.json")),
     agentDir,
     terminal: process.env.TERM_PROGRAM ?? process.env.TERM ?? "unknown",
