@@ -94,6 +94,7 @@ Any risks, blockers, or conflicts detected.`,
 Behavior:
 - Read the pheromone context to understand what scouts and other workers discovered
 - Execute your assigned task completely
+- After making changes, verify your work (e.g. run the build, check syntax). If verification fails, fix it yourself or declare a fix sub-task
 - If you discover sub-tasks needed, declare them (do NOT execute them yourself)
 - Minimize file conflicts — only touch files assigned to you
 
