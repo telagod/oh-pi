@@ -102,7 +102,7 @@ Chaque fourmi est une `AgentSession` in-process (SDK pi), pas un sous-processus 
 
 ```
 pi (processus principal)
-  └─ ant_colony tool
+  └─ commande /colony
        └─ queen.ts → runColony()
             └─ spawnAnt() → createAgentSession()
                  ├─ session.subscribe() → flux de tokens en temps réel

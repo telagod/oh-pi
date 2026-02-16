@@ -102,7 +102,7 @@ Each ant is an in-process `AgentSession` (pi SDK), not a child process:
 
 ```
 pi (main process)
-  └─ ant_colony tool
+  └─ /colony command
        └─ queen.ts → runColony()
             └─ spawnAnt() → createAgentSession()
                  ├─ session.subscribe() → real-time token stream
