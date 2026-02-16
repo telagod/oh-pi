@@ -45,13 +45,14 @@ Vous avez déjà une config ? oh-pi la détecte et propose une **sauvegarde avan
 ├── settings.json        Modèle, thème, niveau de réflexion
 ├── keybindings.json     Raccourcis Vim/Emacs (optionnel)
 ├── AGENTS.md            Directives IA par rôle
-├── extensions/          7 extensions (6 par défaut + colonie)
+├── extensions/          8 extensions (7 par défaut + colonie)
 │   ├── safe-guard       Confirmation des commandes dangereuses + protection des chemins
 │   ├── git-guard        Points de contrôle stash auto + alerte dépôt sale
 │   ├── auto-session     Nommage de session depuis le premier message
 │   ├── custom-footer    Barre d'état améliorée (token/coût/temps/git/cwd)
 │   ├── compact-header   Informations de démarrage simplifiées
 │   ├── auto-update      Vérification des mises à jour au lancement
+│   ├── bg-process       ⏳ **Bg Process** — Mise en arrière-plan automatique des commandes longues (serveurs dev, etc.)
 │   └── ant-colony/      🐜 Essaim multi-agents autonome (optionnel)
 ├── prompts/             10 modèles (/review /fix /commit /test ...)
 ├── skills/              11 compétences (outils + design UI + workflows)
@@ -68,14 +69,11 @@ Vous avez déjà une config ? oh-pi la détecte et propose une **sauvegarde avan
 
 ### Préréglages
 
-| | Thème | Réflexion | Inclut |
-|---|-------|-----------|--------|
-| 🟢 Débutant | oh-pi Dark | medium | Sécurité + bases git |
-| 🔵 Pro | Catppuccin | high | Chaîne d'outils complète |
-| 🟣 Chercheur en sécurité | Cyberpunk | high | Audit + pentest |
-| 🟠 Data & IA | Tokyo Night | medium | MLOps + pipelines |
-| 🔴 Minimal | Default | off | Noyau uniquement |
-| ⚫ Pleine puissance | oh-pi Dark | high | Tout + colonie de fourmis |
+| | Inclut |
+|---|--------|
+| 🟢 **Complet** | Toutes extensions + colonie + bg-process |
+| 🔵 **Propre** | Aucune extension |
+| 🟣 **Colonie** | Colonie uniquement |
 
 ### Fournisseurs
 

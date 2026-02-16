@@ -45,13 +45,14 @@ pi           # 开始编码
 ├── settings.json        模型、主题、思维级别
 ├── keybindings.json     Vim/Emacs 快捷键（可选）
 ├── AGENTS.md            角色专属 AI 指南
-├── extensions/          7 个扩展（6 个默认 + 蚁群）
+├── extensions/          8 个扩展（7 个默认 + 蚁群）
 │   ├── safe-guard       危险命令确认 + 路径保护
 │   ├── git-guard        自动 stash 检查点 + 脏仓库警告
 │   ├── auto-session     从首条消息自动命名会话
 │   ├── custom-footer    增强状态栏（token/成本/时间/git/cwd）
 │   ├── compact-header   精简启动信息
 │   ├── auto-update      启动时检查更新
+│   ├── bg-process       ⏳ **后台进程** — 自动后台化长时间运行的命令（开发服务器等）
 │   └── ant-colony/      🐜 自主多智能体蚁群系统（可选）
 ├── prompts/             10 个模板（/review /fix /commit /test ...）
 ├── skills/              11 个技能（工具 + UI 设计 + 工作流）
@@ -70,12 +71,9 @@ pi           # 开始编码
 
 | | 主题 | 思维 | 包含 |
 |---|------|------|------|
-| 🟢 入门 | oh-pi Dark | medium | 安全 + git 基础 |
-| 🔵 专业开发 | Catppuccin | high | 全工具链 |
-| 🟣 安全研究 | Cyberpunk | high | 审计 + 渗透测试 |
-| 🟠 数据 & AI | Tokyo Night | medium | MLOps + 管道 |
-| 🔴 极简 | Default | off | 仅核心 |
-| ⚫ 全功率 | oh-pi Dark | high | 全部 + 蚁群 |
+| 🟢 全功能 | oh-pi Dark | high | 全部扩展含蚁群 + 后台进程 |
+| 🔵 干净 | Default | off | 无扩展仅核心 |
+| 🟣 仅蚁群 | oh-pi Dark | medium | 蚁群 + 最小配置 |
 
 ### 提供商
 

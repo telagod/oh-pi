@@ -45,13 +45,14 @@ Already have a config? oh-pi detects it and offers **backup before overwriting**
 ├── settings.json        Model, theme, thinking level
 ├── keybindings.json     Vim/Emacs shortcuts (optional)
 ├── AGENTS.md            Role-specific AI guidelines
-├── extensions/          7 extensions (6 default + ant-colony)
+├── extensions/          8 extensions (7 default + ant-colony)
 │   ├── safe-guard       Dangerous command confirmation + path protection
 │   ├── git-guard        Auto stash checkpoints + dirty repo warning
 │   ├── auto-session     Session naming from first message
 │   ├── custom-footer    Enhanced status bar (token/cost/time/git/cwd)
 │   ├── compact-header   Streamlined startup info
 │   ├── auto-update      Check for updates on launch
+│   ├── bg-process       ⏳ **Bg Process** — Auto-background long-running commands (dev servers, etc.)
 │   └── ant-colony/      🐜 Autonomous multi-agent swarm (optional)
 ├── prompts/             10 templates (/review /fix /commit /test ...)
 ├── skills/              11 skills (tools + UI design + workflows)
@@ -70,12 +71,9 @@ Already have a config? oh-pi detects it and offers **backup before overwriting**
 
 | | Theme | Thinking | Includes |
 |---|-------|----------|----------|
-| 🟢 Starter | oh-pi Dark | medium | Safety + git basics |
-| 🔵 Pro Developer | Catppuccin | high | Full toolchain |
-| 🟣 Security Researcher | Cyberpunk | high | Audit + pentesting |
-| 🟠 Data & AI | Tokyo Night | medium | MLOps + pipelines |
-| 🔴 Minimal | Default | off | Core only |
-| ⚫ Full Power | oh-pi Dark | high | Everything + ant colony |
+| ⚫ Full Power | oh-pi Dark | high | All extensions + bg-process + ant-colony |
+| 🔴 Clean | Default | off | No extensions, just core |
+| 🐜 Colony Only | oh-pi Dark | medium | Ant-colony with minimal setup |
 
 ### Providers
 
