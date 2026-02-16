@@ -542,3 +542,76 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     cleanup();
   }
 }
+
+/**
+ * 从检查点恢复蚁群 — 跳过已完成的阶段，继续执行未完成的任务
+ */
+export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
+  const found = Nest.findResumable(opts.cwd);
+  if (!found) return runColony(opts); // 无可恢复状态，正常启动
+
+  const nest = new Nest(opts.cwd, found.colonyId);
+  nest.restore();
+
+  const { signal, callbacks } = opts;
+  const waveBase: Omit<WaveOptions, "caste"> = {
+    nest, cwd: opts.cwd, signal, callbacks,
+    currentModel: opts.currentModel,
+    modelOverrides: opts.modelOverrides,
+    authStorage: opts.authStorage,
+    modelRegistry: opts.modelRegistry,
+  };
+
+  const emitSignal = (phase: ColonyState["status"], message: string) => {
+    const m = nest.getState().metrics;
+    const active = nest.getState().ants.filter(a => a.status === "working").length;
+    const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
+    callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
+  };
+
+  const cleanup = () => {
+    nest.destroy();
+    const parentDir = path.join(opts.cwd, ".ant-colony");
+    try {
+      const entries = fs.readdirSync(parentDir);
+      if (entries.length === 0) fs.rmdirSync(parentDir);
+    } catch { /* ignore */ }
+  };
+
+  callbacks.onPhase?.("working", "Resuming colony from checkpoint...");
+  emitSignal("working", "Resuming...");
+
+  try {
+    // 执行所有 pending 任务
+    const pendingDrones = nest.getAllTasks().filter(t => t.caste === "drone" && t.status === "pending");
+    if (pendingDrones.length > 0) await runAntWave({ ...waveBase, caste: "drone" });
+
+    const pendingWorkers = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending");
+    if (pendingWorkers.length > 0) {
+      const result = await runAntWave({ ...waveBase, caste: "worker" });
+      if (result === "budget") {
+        nest.updateState({ status: "budget_exceeded", finishedAt: Date.now() });
+        emitSignal("budget_exceeded", "Budget exhausted");
+        const s = nest.getState();
+        callbacks.onComplete?.(s);
+        return s;
+      }
+    }
+
+    const finalMetrics = updateMetrics(nest);
+    nest.updateState({ status: "done", finishedAt: Date.now(), metrics: finalMetrics });
+    const finalState = nest.getState();
+    callbacks.onComplete?.(finalState);
+    emitSignal("done", `Resumed: ${finalMetrics.tasksDone}/${finalMetrics.tasksTotal} tasks done`);
+    return finalState;
+
+  } catch (e) {
+    nest.updateState({ status: "failed", finishedAt: Date.now() });
+    const failState = nest.getState();
+    callbacks.onComplete?.(failState);
+    emitSignal("failed", String(e).slice(0, 100));
+    return failState;
+  } finally {
+    cleanup();
+  }
+}

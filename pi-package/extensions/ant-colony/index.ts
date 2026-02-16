@@ -14,7 +14,8 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text, Container, Spacer, matchesKey } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { runColony, type QueenCallbacks } from "./queen.js";
+import { runColony, resumeColony, type QueenCallbacks } from "./queen.js";
+import { Nest } from "./nest.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
 
 // ═══ Helpers ═══
@@ -174,7 +175,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     modelOverrides: Record<string, string>;
     cwd: string;
     modelRegistry?: any;
-  }) {
+  }, resume = false) {
     if (activeColony) {
       pi.events.emit("ant-colony:notify", { msg: "A colony is already running. Use /colony-stop first.", level: "warning" });
       return;
@@ -236,7 +237,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       appendFileSync(gitignorePath, `${gitContent.length && !gitContent.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
     }
 
-    colony.promise = runColony({
+    const colonyOpts = {
       cwd: params.cwd,
       goal: params.goal,
       maxAnts: params.maxAnts,
@@ -247,7 +248,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       callbacks,
       authStorage: undefined,
       modelRegistry: params.modelRegistry,
-    });
+    };
+    colony.promise = resume ? resumeColony(colonyOpts) : runColony(colonyOpts);
 
     activeColony = colony;
     throttledRender();
@@ -566,6 +568,30 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       }
       activeColony.abortController.abort();
       ctx.ui.notify("🐜 Colony abort signal sent. Waiting for ants to finish...", "warning");
+    },
+  });
+
+  pi.registerCommand("colony-resume", {
+    description: "Resume a colony from its last checkpoint",
+    async handler(_args, ctx) {
+      if (activeColony) {
+        ctx.ui.notify("A colony is already running.", "warning");
+        return;
+      }
+      const found = Nest.findResumable(ctx.cwd);
+      if (!found) {
+        ctx.ui.notify("No resumable colony found.", "info");
+        return;
+      }
+      ctx.ui.notify(`🐜 Resuming colony: ${found.state.goal.slice(0, 60)}...`, "info");
+      launchBackgroundColony({
+        cwd: ctx.cwd,
+        goal: found.state.goal,
+        maxCost: found.state.maxCost ?? undefined,
+        currentModel: ctx.currentModel,
+        modelOverrides: {},
+        modelRegistry: ctx.modelRegistry,
+      }, true);
     },
   });
 

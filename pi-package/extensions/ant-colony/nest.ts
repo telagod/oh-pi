@@ -263,4 +263,33 @@ export class Nest {
   private readJson<T>(file: string): T {
     return JSON.parse(fs.readFileSync(file, "utf-8")) as T;
   }
+
+  /** 查找可恢复的蚁群（状态为 working/scouting/reviewing 且未完成） */
+  static findResumable(cwd: string): { colonyId: string; state: ColonyState } | null {
+    const parentDir = path.join(cwd, ".ant-colony");
+    try {
+      for (const dir of fs.readdirSync(parentDir)) {
+        const stateFile = path.join(parentDir, dir, "state.json");
+        if (!fs.existsSync(stateFile)) continue;
+        const state = JSON.parse(fs.readFileSync(stateFile, "utf-8")) as ColonyState;
+        if (!state.finishedAt && state.status !== "done" && state.status !== "failed" && state.status !== "budget_exceeded") {
+          return { colonyId: dir, state };
+        }
+      }
+    } catch { /* no .ant-colony dir */ }
+    return null;
+  }
+
+  /** 从已有文件恢复，不调用 init */
+  restore(): void {
+    this.stateCache = this.readJson<ColonyState>(this.stateFile);
+    // 将 claimed/active 任务重置为 pending（蚂蚁已死）
+    for (const task of this.getAllTasks()) {
+      if (task.status === "claimed" || task.status === "active") {
+        task.status = "pending";
+        task.claimedBy = undefined;
+        this.writeTask(task);
+      }
+    }
+  }
 }
