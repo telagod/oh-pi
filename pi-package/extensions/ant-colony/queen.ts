@@ -22,6 +22,7 @@ import { DEFAULT_ANT_CONFIGS } from "./types.js";
 import { Nest } from "./nest.js";
 import { spawnAnt, runDrone, makeTaskId } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
+import { buildImportGraph, taskDependsOn, type ImportGraph } from "./deps.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
 export interface QueenCallbacks {
@@ -149,6 +150,7 @@ interface WaveOptions {
   callbacks: QueenCallbacks;
   authStorage?: AuthStorage;
   modelRegistry?: ModelRegistry;
+  importGraph?: ImportGraph;
 }
 
 /**
@@ -188,11 +190,13 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
 
       // 蚂蚁产生的子任务加入巢穴
       for (const sub of result.newTasks) {
-        // 检查文件锁冲突
+        // 检查文件锁冲突和依赖冲突
         const allTasks = nest.getAllTasks();
         const conflicting = allTasks.find(t =>
-          t.status === "active" &&
-          t.files.some(f => sub.files.includes(f))
+          t.status === "active" && (
+            t.files.some(f => sub.files.includes(f)) ||
+            (opts.importGraph && taskDependsOn(sub.files, t.files, opts.importGraph))
+          )
         );
         const child = childTaskFromParsed(task.id, sub);
         if (conflicting) {
@@ -230,11 +234,15 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
       await new Promise(r => setTimeout(r, backoffMs));
     }
 
-    // 解除 blocked 任务（如果锁定文件已释放）
+    // 解除 blocked 任务（如果锁定文件和依赖文件都已释放）
     const activeTasks = state.tasks.filter(t => t.status === "active");
     const activeFiles = new Set(activeTasks.flatMap(t => t.files));
     for (const t of state.tasks.filter(t => t.status === "blocked" && t.caste === caste)) {
-      if (!t.files.some(f => activeFiles.has(f))) {
+      const fileConflict = t.files.some(f => activeFiles.has(f));
+      const depConflict = opts.importGraph && activeTasks.some(at =>
+        taskDependsOn(t.files, at.files, opts.importGraph!)
+      );
+      if (!fileConflict && !depConflict) {
         nest.updateTaskStatus(t.id, "pending");
       }
     }
@@ -324,7 +332,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 
   nest.init(initialState);
   const { signal, callbacks } = opts;
-  const waveBase: Omit<WaveOptions, "caste"> = {
+  const waveBase: Omit<WaveOptions, "caste"> & { importGraph?: ImportGraph } = {
     nest, cwd: opts.cwd, signal, callbacks,
     currentModel: opts.currentModel,
     modelOverrides: opts.modelOverrides,
@@ -386,6 +394,16 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 
     // ═══ Phase 2: 工作 ═══
     nest.updateState({ status: "working" });
+
+    // 构建 import graph 用于依赖感知调度
+    let importGraph: ImportGraph | undefined;
+    try {
+      const allFiles = nest.getAllTasks().flatMap(t => t.files).filter(f => /\.[tj]sx?$/.test(f));
+      if (allFiles.length > 0) {
+        importGraph = buildImportGraph([...new Set(allFiles)], opts.cwd);
+        waveBase.importGraph = importGraph;
+      }
+    } catch { /* graph build failed, proceed without */ }
 
     // 先执行 drone 任务（零 LLM 成本）
     const droneTasks = nest.getAllTasks().filter(t => t.caste === "drone" && t.status === "pending");

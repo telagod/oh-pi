@@ -168,7 +168,7 @@ function parseSubTasks(output: string): ParsedSubTask[] {
     tasks.push({
       title: m[1]?.trim() || "Untitled",
       description: m[2]?.trim() || m[1]?.trim() || "",
-      files: (m[3]?.trim() || "").split(",").map(f => f.trim()).filter(Boolean),
+      files: (m[3]?.trim() || "").split(",").map((f: string) => f.trim()).filter(Boolean),
       caste: (m[4]?.trim() as AntCaste) || "worker",
       priority: (parseInt(m[5] || "3") as 1 | 2 | 3 | 4 | 5) || 3,
       context,
@@ -361,7 +361,7 @@ export async function spawnAnt(
     });
 
     // 订阅实时事件
-    session.subscribe((event) => {
+    session.subscribe((event: any) => {
       if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         const delta = event.assistantMessageEvent.delta;
         accumulatedText += delta;
