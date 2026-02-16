@@ -13,7 +13,6 @@ import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text, Container, Spacer, matchesKey } from "@mariozechner/pi-tui";
-import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
 
@@ -469,11 +468,14 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
   // ═══ Command: /colony ═══
   pi.registerCommand("colony", {
-    description: "Launch an ant colony with a goal",
-    parameters: Type.Object({
-      goal: Type.String({ description: "What the colony should accomplish" }),
-    }),
+    description: "Launch an ant colony with a goal. Usage: /colony <goal>",
     async handler(args, ctx) {
+      const goal = args.trim();
+      if (!goal) {
+        ctx.ui.notify("Usage: /colony <goal>", "warning");
+        return;
+      }
+
       const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
       if (!currentModel) {
         ctx.ui.notify("No model available in current session", "error");
@@ -481,7 +483,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       }
 
       const colonyParams = {
-        goal: args.goal,
+        goal,
         currentModel,
         modelOverrides: {},
         cwd: ctx.cwd,
@@ -497,7 +499,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       }
 
       launchBackgroundColony(colonyParams);
-      ctx.ui.notify(`🐜 Colony launched: ${args.goal.slice(0, 50)}`, "success");
+      ctx.ui.notify(`🐜 Colony launched: ${goal.slice(0, 50)}`, "success");
     },
   });
 
