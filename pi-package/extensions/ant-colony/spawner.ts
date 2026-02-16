@@ -23,6 +23,7 @@ import {
   SessionManager,
   SettingsManager,
   type ResourceLoader,
+  type AgentSessionEvent,
   createExtensionRuntime,
 } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
@@ -361,7 +362,7 @@ export async function spawnAnt(
     });
 
     // 订阅实时事件
-    session.subscribe((event: any) => {
+    session.subscribe((event: AgentSessionEvent) => {
       if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         const delta = event.assistantMessageEvent.delta;
         accumulatedText += delta;
