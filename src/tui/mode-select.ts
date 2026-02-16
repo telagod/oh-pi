@@ -4,6 +4,11 @@ import type { EnvInfo } from "../utils/detect.js";
 
 export type Mode = "quick" | "custom" | "preset";
 
+/**
+ * Prompt the user to select a configuration mode: quick, preset, or custom.
+ * @param {EnvInfo} env - Detected environment information
+ * @returns {Promise<Mode>} The mode selected by the user
+ */
 export async function selectMode(env: EnvInfo): Promise<Mode> {
   const mode = await p.select({
     message: t("mode.select"),

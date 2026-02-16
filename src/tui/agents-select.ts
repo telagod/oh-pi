@@ -1,6 +1,14 @@
 import * as p from "@clack/prompts";
 import { t } from "../i18n.js";
 
+/**
+ * Presents an interactive prompt for the user to select an agent template
+ * (e.g. general developer, fullstack, security, data/AI, colony operator).
+ *
+ * Exits the process if the user cancels the selection.
+ *
+ * @returns The selected agent template identifier string.
+ */
 export async function selectAgents(): Promise<string> {
   const agent = await p.select({
     message: t("agent.select"),

@@ -4,6 +4,10 @@ import type { OhPConfig } from "../types.js";
 
 interface Preset extends Omit<OhPConfig, "providers"> {}
 
+/**
+ * Registry of built-in configuration presets (Full Power / Clean / Colony).
+ * Each entry maps a preset key to its i18n label/hint keys and a full {@link Preset} config object.
+ */
 const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Preset }> = {
   full: {
     labelKey: "preset.full", hintKey: "preset.fullHint",
@@ -32,6 +36,11 @@ const PRESETS: Record<string, { labelKey: string; hintKey: string; config: Prese
   },
 };
 
+/**
+ * Prompts the user to select a configuration preset via an interactive TUI menu.
+ * Exits the process if the user cancels the selection.
+ * @returns The {@link Preset} configuration object for the chosen preset.
+ */
 export async function selectPreset(): Promise<Preset> {
   const key = await p.select({
     message: t("preset.select"),

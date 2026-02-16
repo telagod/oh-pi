@@ -20,7 +20,13 @@ interface FetchResult {
   api?: string;
 }
 
-/** Fetch models dynamically — tries multiple API styles, returns metadata + detected API type */
+/**
+ * 动态获取模型列表，依次尝试 Anthropic、Google、OpenAI 兼容 API 风格。
+ * @param provider - 提供商名称
+ * @param baseUrl - API 基础地址
+ * @param apiKey - API 密钥或环境变量名
+ * @returns 发现的模型列表及检测到的 API 类型
+ */
 async function fetchModels(provider: string, baseUrl: string, apiKey: string): Promise<FetchResult> {
   const base = baseUrl.replace(/\/+$/, "");
   const resolvedKey = process.env[apiKey] ?? apiKey;
@@ -101,6 +107,11 @@ async function fetchModels(provider: string, baseUrl: string, apiKey: string): P
   return { models: [] };
 }
 
+/**
+ * Interactively configure API providers, detecting existing keys, allowing multi-select, and supporting custom endpoints.
+ * @param env - Current environment info with detected providers
+ * @returns Configured provider list
+ */
 export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
   const entries = Object.entries(PROVIDERS);
 
@@ -179,6 +190,10 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
   return configs;
 }
 
+/**
+ * Interactively configure a custom provider (Ollama, vLLM, or other OpenAI-compatible endpoints).
+ * @returns Custom provider config, or null if cancelled
+ */
 async function setupCustomProvider(): Promise<ProviderConfig | null> {
   const name = await p.text({
     message: t("provider.name"),
@@ -215,6 +230,15 @@ interface SelectResult {
   api?: string;
 }
 
+/**
+ * Select a default model by dynamically fetching available models, falling back to a static list or manual input.
+ * @param provider - Provider name
+ * @param label - Provider display label
+ * @param staticModels - Static model list fallback
+ * @param baseUrl - API base URL
+ * @param apiKey - API key
+ * @returns Selected model and discovered model metadata
+ */
 async function selectModelWithMeta(provider: string, label: string, staticModels: string[], baseUrl?: string, apiKey?: string): Promise<SelectResult> {
   let modelIds = staticModels;
   let discoveredModels: DiscoveredModel[] | undefined;
@@ -252,6 +276,11 @@ async function selectModelWithMeta(provider: string, label: string, staticModels
   return { defaultModel: model, discoveredModels, api };
 }
 
+/**
+ * Prompt the user to enter an API key.
+ * @param label - Provider display label
+ * @returns The entered API key
+ */
 async function promptKey(label: string): Promise<string> {
   const key = await p.password({
     message: t("provider.apiKey", { label }),

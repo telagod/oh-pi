@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/**
+ * @module oh-pi CLI 入口脚本
+ * 处理 Windows 终端 UTF-8 编码，然后启动主流程。
+ */
 import { execSync } from "node:child_process";
 
 // Windows terminals default to non-UTF-8 codepage (e.g. GBK/CP936),

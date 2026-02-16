@@ -5,10 +5,21 @@ import type { OhPConfig } from "../types.js";
 import type { EnvInfo } from "../utils/detect.js";
 import { applyConfig, installPi, backupConfig } from "../utils/install.js";
 
+/**
+ * 统计已有配置中指定目录下的文件数量。
+ * @param env - 环境信息
+ * @param dir - 目录名称前缀
+ * @returns 匹配的文件数
+ */
 function countExisting(env: EnvInfo, dir: string): number {
   return env.existingFiles.filter(f => f.startsWith(dir + "/")).length;
 }
 
+/**
+ * 展示配置摘要，处理已有配置的备份/覆盖，安装 pi（如需），并应用最终配置。
+ * @param config - 用户选择的配置对象
+ * @param env - 当前环境信息
+ */
 export async function confirmApply(config: OhPConfig, env: EnvInfo) {
   // ═══ Summary ═══
   const summary = [

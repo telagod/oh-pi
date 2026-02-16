@@ -3,6 +3,10 @@ import chalk from "chalk";
 import { t } from "../i18n.js";
 import type { EnvInfo } from "../utils/detect.js";
 
+/**
+ * 展示欢迎界面，显示 pi 安装状态、环境信息及已有配置概况。
+ * @param {EnvInfo} env - 当前检测到的环境信息
+ */
 export function welcome(env: EnvInfo) {
   console.clear();
   p.intro(chalk.cyan.bold(" oh-pi ") + chalk.dim(t("welcome.title")));
@@ -28,6 +32,11 @@ export function welcome(env: EnvInfo) {
   }
 }
 
+/**
+ * 按顶层目录分类统计文件数量，返回格式化字符串。
+ * @param {string[]} files - 文件相对路径列表
+ * @returns {string} 分类统计字符串，如 "extensions (3)  prompts (5)"
+ */
 function categorize(files: string[]): string {
   const cats: Record<string, number> = {};
   for (const f of files) {

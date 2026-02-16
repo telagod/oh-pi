@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RESOURCES = join(PKG_ROOT, "pi-package");
 
+/** 资源路径映射对象 */
 export const resources = {
   agent:     (name: string) => join(RESOURCES, "agents", `${name}.md`),
   extension: (name: string) => join(RESOURCES, "extensions", name),
