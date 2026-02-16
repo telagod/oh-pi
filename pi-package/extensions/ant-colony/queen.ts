@@ -72,7 +72,7 @@ function makeInitialScoutTask(goal: string): Task {
 
 function childTaskFromParsed(
   parentId: string,
-  parsed: { title: string; description: string; files: string[]; caste: AntCaste; priority: TaskPriority },
+  parsed: { title: string; description: string; files: string[]; caste: AntCaste; priority: TaskPriority; context?: string },
 ): Task {
   return {
     id: makeTaskId(),
@@ -83,6 +83,7 @@ function childTaskFromParsed(
     status: "pending",
     priority: parsed.priority,
     files: parsed.files,
+    context: parsed.context || undefined,
     claimedBy: null,
     result: null,
     error: null,
@@ -398,9 +399,18 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       await runAntWave({ ...waveBase, caste: "worker" });
     }
 
+    // ═══ Auto-check: run tsc before soldier review ═══
+    let tscPassed = true;
+    try {
+      const { execSync } = await import("node:child_process");
+      execSync("npx tsc --noEmit", { cwd: opts.cwd, timeout: 30000, stdio: "pipe" });
+    } catch {
+      tscPassed = false;
+    }
+
     // ═══ Phase 3: 审查 ═══
     const completedWorkerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "done");
-    if (completedWorkerTasks.length > 0) {
+    if (completedWorkerTasks.length > 0 && (!tscPassed || completedWorkerTasks.length > 3)) {
       nest.updateState({ status: "reviewing" });
       callbacks.onPhase("reviewing", "Dispatching soldier ants to review changes...");
       const reviewTask = makeReviewTask(completedWorkerTasks);

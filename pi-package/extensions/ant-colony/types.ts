@@ -35,6 +35,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   files: string[];           // 锁定的文件
+  context?: string;          // Scout 预加载的代码片段
   claimedBy: string | null;  // ant id
   result: string | null;
   error: string | null;

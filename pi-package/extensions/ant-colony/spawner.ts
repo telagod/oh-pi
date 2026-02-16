@@ -57,6 +57,7 @@ export interface ParsedSubTask {
   files: string[];
   caste: AntCaste;
   priority: 1 | 2 | 3 | 4 | 5;
+  context?: string;
 }
 
 const CASTE_PROMPTS: Record<AntCaste, string> = {
@@ -67,6 +68,7 @@ Behavior:
 - Identify files, functions, dependencies related to the goal
 - IMPORTANT: After EACH tool call, summarize what you found so far. Do NOT wait until the end.
 - Report findings as structured intelligence for Worker Ants
+- For each recommended task, include the KEY code snippets (with file:line) the worker will need — this saves workers from re-reading files
 
 Output format (MUST follow exactly):
 ## Discoveries
@@ -79,6 +81,7 @@ For each task the colony should do next:
 - files: <comma-separated file paths>
 - caste: worker
 - priority: <1-5, 1=highest>
+- context: <relevant code snippets that the worker will need, with file:line references>
 
 ## Warnings
 Any risks, blockers, or conflicts detected.`,
@@ -142,6 +145,9 @@ function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, 
   if (task.files.length > 0) {
     prompt += `**Files scope:** ${task.files.join(", ")}\n`;
   }
+  if (task.context) {
+    prompt += `\n## Pre-loaded Context (from scout)\n${task.context}\n`;
+  }
   if (/[\u4e00-\u9fff]/.test(task.description)) {
     prompt += '\nIMPORTANT: Follow the language requirements specified in the task description. If the task says to write in Chinese, write in Chinese.\n';
   }
@@ -152,13 +158,18 @@ function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, 
 function parseSubTasks(output: string): ParsedSubTask[] {
   const tasks: ParsedSubTask[] = [];
   const regex = /### TASK:\s*(.+)\n(?:- description:\s*(.+)\n)?(?:- files:\s*(.+)\n)?(?:- caste:\s*(\w+)\n)?(?:- priority:\s*(\d))?/g;
+  const taskBlocks = output.split(/(?=### TASK:)/);
   for (const m of output.matchAll(regex)) {
+    const block = taskBlocks.find(b => b.includes(`### TASK: ${m[1]?.trim()}`)) || "";
+    const ctxMatch = block.match(/- context:\s*([\s\S]*?)(?=### TASK:|## |\n\n|$)/);
+    const context = ctxMatch?.[1]?.trim() || undefined;
     tasks.push({
       title: m[1]?.trim() || "Untitled",
       description: m[2]?.trim() || m[1]?.trim() || "",
       files: (m[3]?.trim() || "").split(",").map(f => f.trim()).filter(Boolean),
       caste: (m[4]?.trim() as AntCaste) || "worker",
       priority: (parseInt(m[5] || "3") as 1 | 2 | 3 | 4 | 5) || 3,
+      context,
     });
   }
   return tasks;
