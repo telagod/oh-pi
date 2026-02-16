@@ -18,34 +18,7 @@ import { runColony, resumeColony, type QueenCallbacks } from "./queen.js";
 import { Nest } from "./nest.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
 
-// ═══ Helpers ═══
-
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  return `${m}m${s % 60}s`;
-}
-
-function formatCost(cost: number): string {
-  return cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`;
-}
-
-function formatTokens(n: number): string {
-  return n < 1000 ? `${n}` : n < 1000000 ? `${(n / 1000).toFixed(1)}k` : `${(n / 1000000).toFixed(1)}M`;
-}
-
-function statusIcon(status: string): string {
-  const icons: Record<string, string> = {
-    scouting: "🔍", working: "⚒️", reviewing: "🛡️",
-    done: "✅", failed: "❌", budget_exceeded: "💰",
-  };
-  return icons[status] || "🐜";
-}
-
-function casteIcon(caste: string): string {
-  return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : caste === "drone" ? "⚙️" : "⚒️";
-}
+import { formatDuration, formatCost, formatTokens, statusIcon, casteIcon } from "./ui.js";
 
 // ═══ Background colony state ═══
 

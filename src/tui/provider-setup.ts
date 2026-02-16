@@ -1,7 +1,8 @@
 import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { t } from "../i18n.js";
-import { PROVIDERS, type ProviderConfig, type DiscoveredModel } from "../types.js";
+import type { ProviderConfig, DiscoveredModel } from "../types.js";
+import { PROVIDERS } from "../registry.js";
 import type { EnvInfo } from "../utils/detect.js";
 
 /** Provider API base URLs for dynamic model fetching */

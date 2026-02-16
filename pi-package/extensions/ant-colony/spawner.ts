@@ -10,8 +10,6 @@
 import {
   AuthStorage,
   createAgentSession,
-  createCodingTools,
-  createReadOnlyTools,
   createReadTool,
   createBashTool,
   createEditTool,
@@ -27,8 +25,10 @@ import {
   createExtensionRuntime,
 } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
-import type { Ant, AntCaste, AntConfig, Task, Pheromone, AntStreamEvent } from "./types.js";
+import type { Ant, AntCaste, AntConfig, Task, AntStreamEvent } from "./types.js";
 import type { Nest } from "./nest.js";
+import { CASTE_PROMPTS, buildPrompt } from "./prompts.js";
+import { parseSubTasks, extractPheromones, type ParsedSubTask } from "./parser.js";
 
 let antCounter = 0;
 
@@ -48,178 +48,12 @@ export interface AntResult {
   ant: Ant;
   output: string;
   newTasks: ParsedSubTask[];
-  pheromones: Pheromone[];
+  pheromones: import("./types.js").Pheromone[];
   rateLimited: boolean;
 }
 
-export interface ParsedSubTask {
-  title: string;
-  description: string;
-  files: string[];
-  caste: AntCaste;
-  priority: 1 | 2 | 3 | 4 | 5;
-  context?: string;
-}
-
-const CASTE_PROMPTS: Record<AntCaste, string> = {
-  scout: `You are a Scout Ant. Your job is to explore and gather intelligence, NOT to make changes.
-
-Behavior:
-- Quickly scan the codebase to understand structure and locate relevant code
-- Identify files, functions, dependencies related to the goal
-- IMPORTANT: After EACH tool call, summarize what you found so far. Do NOT wait until the end.
-- Report findings as structured intelligence for Worker Ants
-- For each recommended task, include the KEY code snippets (with file:line) the worker will need — this saves workers from re-reading files
-
-Output format (MUST follow exactly):
-## Discoveries
-- What you found, with file:line references
-
-## Recommended Tasks
-For each task the colony should do next:
-### TASK: <title>
-- description: <what to do>
-- files: <comma-separated file paths>
-- caste: worker
-- priority: <1-5, 1=highest>
-- context: <relevant code snippets that the worker will need, with file:line references>
-
-Use caste "drone" instead of "worker" for simple tasks that can be done with a single bash command (file copy, find-replace, formatting, running tests). Drone description should be the exact bash command to execute.
-
-## Warnings
-Any risks, blockers, or conflicts detected.`,
-
-  worker: `You are a Worker Ant. You execute tasks autonomously and leave traces for the colony.
-
-Behavior:
-- Read the pheromone context to understand what scouts and other workers discovered
-- Execute your assigned task completely
-- After making changes, verify your work (e.g. run the build, check syntax). If verification fails, fix it yourself or declare a fix sub-task
-- If you discover sub-tasks needed, declare them (do NOT execute them yourself)
-- Minimize file conflicts — only touch files assigned to you
-
-Output format (MUST follow exactly):
-## Completed
-What was done, with file:line references for all changes.
-
-## Files Changed
-- path/to/file.ts — what changed
-
-## Sub-Tasks (if any)
-### TASK: <title>
-- description: <what to do>
-- files: <comma-separated file paths>
-- caste: <worker|soldier>
-- priority: <1-5>
-
-## Pheromone
-Key information other ants should know about your changes.`,
-
-  soldier: `You are a Soldier Ant (Reviewer). You guard colony quality — you do NOT make changes.
-
-Behavior:
-- Review the files changed by worker ants
-- Check for bugs, security issues, conflicts between workers
-- Report issues that need fixing
-
-Output format (MUST follow exactly):
-## Review
-- file:line — issue description (severity: critical|warning|info)
-
-## Fix Tasks (if critical issues found)
-### TASK: <title>
-- description: <what to fix>
-- files: <comma-separated file paths>
-- caste: worker
-- priority: 1
-
-## Verdict
-PASS or FAIL with summary.`,
-};
-
-function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, maxTurns?: number): string {
-  let prompt = castePrompt + "\n\n";
-  if (maxTurns) {
-    prompt += `## ⚠️ Turn Limit\nYou have a MAXIMUM of ${maxTurns} turns. Plan accordingly — reserve your LAST turn to output the structured result format above. Do NOT waste turns on unnecessary exploration.\n\n`;
-  }
-  if (pheromoneContext) {
-    prompt += `## Colony Pheromone Trail (intelligence from other ants)\n${pheromoneContext}\n\n`;
-  }
-  prompt += `## Your Assignment\n**Task:** ${task.title}\n**Description:** ${task.description}\n`;
-  if (task.files.length > 0) {
-    prompt += `**Files scope:** ${task.files.join(", ")}\n`;
-  }
-  if (task.context) {
-    prompt += `\n## Pre-loaded Context (from scout)\n${task.context}\n`;
-  }
-  if (/[\u4e00-\u9fff]/.test(task.description)) {
-    prompt += '\nIMPORTANT: Follow the language requirements specified in the task description. If the task says to write in Chinese, write in Chinese.\n';
-  }
-  return prompt;
-}
-
-/** 从蚂蚁输出中解析子任务声明 */
-function parseSubTasks(output: string): ParsedSubTask[] {
-  const tasks: ParsedSubTask[] = [];
-  const regex = /### TASK:\s*(.+)\n(?:- description:\s*(.+)\n)?(?:- files:\s*(.+)\n)?(?:- caste:\s*(\w+)\n)?(?:- priority:\s*(\d))?/g;
-  const taskBlocks = output.split(/(?=### TASK:)/);
-  for (const m of output.matchAll(regex)) {
-    const block = taskBlocks.find(b => b.includes(`### TASK: ${m[1]?.trim()}`)) || "";
-    const ctxMatch = block.match(/- context:\s*([\s\S]*?)(?=### TASK:|## |\n\n|$)/);
-    const context = ctxMatch?.[1]?.trim() || undefined;
-    tasks.push({
-      title: m[1]?.trim() || "Untitled",
-      description: m[2]?.trim() || m[1]?.trim() || "",
-      files: (m[3]?.trim() || "").split(",").map((f: string) => f.trim()).filter(Boolean),
-      caste: (m[4]?.trim() as AntCaste) || "worker",
-      priority: (parseInt(m[5] || "3") as 1 | 2 | 3 | 4 | 5) || 3,
-      context,
-    });
-  }
-  return tasks;
-}
-
-/** 从蚂蚁输出中提取信息素（failed=true 时自动释放 repellent） */
-function extractPheromones(antId: string, caste: AntCaste, taskId: string, output: string, files: string[], failed = false): Pheromone[] {
-  const pheromones: Pheromone[] = [];
-  const now = Date.now();
-  const sections = ["Discoveries", "Pheromone", "Files Changed", "Warnings", "Review"];
-  for (const section of sections) {
-    const regex = new RegExp(`## ${section}\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
-    const match = output.match(regex);
-    if (match?.[1]?.trim()) {
-      const type: import("./types.js").PheromoneType =
-        section === "Discoveries" ? "discovery" :
-        section === "Warnings" || section === "Review" ? "warning" :
-        section === "Files Changed" ? "completion" : "progress";
-      pheromones.push({
-        id: makePheromoneId(),
-        type,
-        antId,
-        antCaste: caste,
-        taskId,
-        content: match[1].trim().slice(0, 2000),
-        files,
-        strength: 1.0,
-        createdAt: now,
-      });
-    }
-  }
-  if (failed && files.length > 0) {
-    pheromones.push({
-      id: makePheromoneId(),
-      type: "repellent",
-      antId,
-      antCaste: caste,
-      taskId,
-      content: `Task failed on files: ${files.join(", ")}`,
-      files,
-      strength: 1.0,
-      createdAt: now,
-    });
-  }
-  return pheromones;
-}
+// Re-export for queen.ts compatibility
+export type { ParsedSubTask } from "./parser.js";
 
 /** 根据 tools 列表创建对应的 tool 实例 */
 function createToolsForCaste(cwd: string, toolNames: string[]) {
@@ -243,7 +77,6 @@ function resolveModel(modelStr: string, modelRegistry: ModelRegistry) {
     const id = modelStr.slice(slashIdx + 1);
     return modelRegistry.find(provider, id) || getModel(provider, id);
   }
-  // 尝试所有 provider
   for (const provider of ["anthropic", "openai", "google"]) {
     const m = modelRegistry.find(provider, modelStr) || getModel(provider, modelStr);
     if (m) return m;
@@ -269,7 +102,6 @@ function makeMinimalResourceLoader(systemPrompt: string): ResourceLoader {
 
 /**
  * 运行 Drone — 纯规则执行，零 LLM 成本
- * 任务描述即为要执行的 bash 命令
  */
 export async function runDrone(
   cwd: string,
@@ -340,12 +172,10 @@ export async function spawnAnt(
   nest.updateAnt(ant);
   nest.updateTaskStatus(task.id, "active");
 
-  // 构建 system prompt
   const pheromoneCtx = nest.getPheromoneContext(task.files);
   const castePrompt = CASTE_PROMPTS[antConfig.caste];
   const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, antConfig.maxTurns);
 
-  // 解析模型
   const auth = authStorage ?? new AuthStorage();
   const registry = modelRegistry ?? new ModelRegistry(auth);
   const model = resolveModel(antConfig.model, registry);
@@ -375,7 +205,6 @@ export async function spawnAnt(
       settingsManager,
     });
 
-    // 订阅实时事件
     session.subscribe((event: AgentSessionEvent) => {
       if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         const delta = event.assistantMessageEvent.delta;
@@ -391,7 +220,6 @@ export async function spawnAnt(
 
       if (event.type === "turn_end") {
         ant.usage.turns++;
-        // 实时提取信息素（scout）
         if (antConfig.caste === "scout" && accumulatedText) {
           const livePheromones = extractPheromones(antId, antConfig.caste, task.id, accumulatedText, task.files);
           for (const p of livePheromones) {
@@ -411,10 +239,8 @@ export async function spawnAnt(
       }
     });
 
-    // 执行任务
     const userPrompt = `Execute this task: ${task.title}\n\n${task.description}`;
 
-    // 处理 abort signal
     if (signal) {
       const onAbort = () => session.abort();
       if (signal.aborted) {
@@ -426,11 +252,9 @@ export async function spawnAnt(
 
     await session.prompt(userPrompt);
 
-    // 获取最终输出
     const messages = session.messages;
     let finalOutput = accumulatedText;
     if (!finalOutput) {
-      // fallback: 从 messages 中提取
       for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg.role === "assistant") {
@@ -454,7 +278,6 @@ export async function spawnAnt(
     for (const p of pheromones) nest.dropPheromone(p);
 
     nest.updateTaskStatus(task.id, "done", finalOutput);
-
     session.dispose();
 
     return { ant, output: finalOutput, newTasks, pheromones, rateLimited: false };
@@ -475,7 +298,6 @@ export async function spawnAnt(
     ant.finishedAt = Date.now();
     nest.updateAnt(ant);
 
-    // 尝试解析部分产出
     const newTasks = parseSubTasks(accumulatedText);
     const pheromones = extractPheromones(antId, antConfig.caste, task.id, accumulatedText, task.files, true);
     for (const p of pheromones) nest.dropPheromone(p);

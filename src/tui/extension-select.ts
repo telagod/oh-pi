@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import { t } from "../i18n.js";
-import { EXTENSIONS } from "../types.js";
+import { EXTENSIONS } from "../registry.js";
 
 /**
  * Prompts the user to select enabled extensions from the available list via a multi-select TUI prompt.

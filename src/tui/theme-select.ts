@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import { t } from "../i18n.js";
-import { THEMES } from "../types.js";
+import { THEMES } from "../registry.js";
 
 /**
  * Prompts the user to select a theme from the available themes list.
