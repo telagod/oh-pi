@@ -118,24 +118,27 @@ export class Nest {
     }
   }
 
-  /** 获取下一个可领取的任务（按优先级 + 信息素强度排序） */
+  /** 获取下一个可领取的任务（按优先级 + 信息素强度 - repellent负信息素排序，ε-greedy 随机觅食） */
   nextPendingTask(caste: "scout" | "worker" | "soldier"): Task | null {
     const tasks = this.getAllTasks()
       .filter(t => t.status === "pending" && t.caste === caste);
     if (tasks.length === 0) return null;
 
-    // 按优先级排序，同优先级按创建时间
-    tasks.sort((a, b) => a.priority - b.priority || a.createdAt - b.createdAt);
+    // ε-greedy：10% 概率随机选任务，避免蚂蚁全挤同一条路
+    if (tasks.length > 1 && Math.random() < 0.1) {
+      return tasks[Math.floor(Math.random() * tasks.length)];
+    }
 
-    // 信息素加权：有相关 discovery 信息素的任务优先
+    // 信息素加权：discovery/completion 加分，warning/repellent 减分（负信息素）
     const pheromones = this.getAllPheromones();
     const scored = tasks.map(t => {
-      const relevantP = pheromones.filter(p =>
-        p.type === "discovery" &&
-        p.files.some(f => t.files.includes(f)) &&
-        p.strength > 0.1
-      );
-      const pScore = relevantP.reduce((sum, p) => sum + p.strength, 0);
+      let pScore = 0;
+      for (const p of pheromones) {
+        if (!p.files.some(f => t.files.includes(f)) || p.strength <= 0.1) continue;
+        if (p.type === "discovery" || p.type === "completion") pScore += p.strength;
+        else if (p.type === "repellent") pScore -= p.strength * 3;  // repellent 负信息素惩罚最重
+        else if (p.type === "warning") pScore -= p.strength;
+      }
       return { task: t, score: (6 - t.priority) + pScore };
     });
     scored.sort((a, b) => b.score - a.score);

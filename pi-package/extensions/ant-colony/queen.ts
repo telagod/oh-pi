@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { DEFAULT_ANT_CONFIGS } from "./types.js";
 import { Nest } from "./nest.js";
-import { spawnAnt, runDrone, makeTaskId } from "./spawner.js";
+import { spawnAnt, runDrone, makeTaskId, makePheromoneId } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
 import { buildImportGraph, taskDependsOn, type ImportGraph } from "./deps.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
@@ -198,8 +198,12 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
         return "rate_limited";
       }
 
-      // 蚂蚁产生的子任务加入巢穴
-      for (const sub of result.newTasks) {
+      // 蚂蚁产生的子任务加入巢穴（限制繁殖上限，防止任务膨胀）
+      const MAX_TOTAL_TASKS = 30;
+      const MAX_SUB_PER_TASK = 5;
+      const accepted = result.newTasks.slice(0, MAX_SUB_PER_TASK);
+      for (const sub of accepted) {
+        if (nest.getAllTasks().length >= MAX_TOTAL_TASKS) break;
         // 检查文件锁冲突和依赖冲突
         const allTasks = nest.getAllTasks();
         const conflicting = allTasks.find(t =>
@@ -215,6 +219,16 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
         nest.addSubTask(task.id, child);
       }
 
+      // 路径强化：成功完成释放 completion 信息素，强化相关文件路径
+      if (task.files.length > 0) {
+        nest.dropPheromone({
+          id: makePheromoneId(), type: "completion", antId: result.ant.id,
+          antCaste: caste, taskId: task.id,
+          content: `Success: ${task.title}`,
+          files: task.files, strength: 1.0, createdAt: Date.now(),
+        });
+      }
+
       // 更新指标
       const metrics = updateMetrics(nest);
       callbacks.onProgress?.(metrics);
@@ -226,6 +240,15 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
         retriedTasks.add(task.id);
         nest.updateTaskStatus(task.id, "pending");
       } else {
+        // 负信息素：失败任务释放 warning，阻止后续蚂蚁走同一条路
+        if (task.files.length > 0) {
+          nest.dropPheromone({
+            id: makePheromoneId(), type: "warning", antId: "queen",
+            antCaste: caste, taskId: task.id,
+            content: `Failed: ${task.title} — ${String(e).slice(0, 100)}`,
+            files: task.files, strength: 1.0, createdAt: Date.now(),
+          });
+        }
         nest.updateTaskStatus(task.id, "failed", undefined, String(e));
       }
       return "done";

@@ -52,7 +52,8 @@ export type PheromoneType =
   | "progress"     // 工蚁进度
   | "warning"      // 危险标记（失败、冲突）
   | "completion"   // 完成标记
-  | "dependency";  // 依赖关系
+  | "dependency"   // 依赖关系
+  | "repellent";   // 负信息素（任务失败时释放，降低相关任务优先级）
 
 export interface Pheromone {
   id: string;

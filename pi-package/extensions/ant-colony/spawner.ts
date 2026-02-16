@@ -179,8 +179,8 @@ function parseSubTasks(output: string): ParsedSubTask[] {
   return tasks;
 }
 
-/** 从蚂蚁输出中提取信息素 */
-function extractPheromones(antId: string, caste: AntCaste, taskId: string, output: string, files: string[]): Pheromone[] {
+/** 从蚂蚁输出中提取信息素（failed=true 时自动释放 repellent） */
+function extractPheromones(antId: string, caste: AntCaste, taskId: string, output: string, files: string[], failed = false): Pheromone[] {
   const pheromones: Pheromone[] = [];
   const now = Date.now();
   const sections = ["Discoveries", "Pheromone", "Files Changed", "Warnings", "Review"];
@@ -204,6 +204,19 @@ function extractPheromones(antId: string, caste: AntCaste, taskId: string, outpu
         createdAt: now,
       });
     }
+  }
+  if (failed && files.length > 0) {
+    pheromones.push({
+      id: makePheromoneId(),
+      type: "repellent",
+      antId,
+      antCaste: caste,
+      taskId,
+      content: `Task failed on files: ${files.join(", ")}`,
+      files,
+      strength: 1.0,
+      createdAt: now,
+    });
   }
   return pheromones;
 }
@@ -464,7 +477,7 @@ export async function spawnAnt(
 
     // 尝试解析部分产出
     const newTasks = parseSubTasks(accumulatedText);
-    const pheromones = extractPheromones(antId, antConfig.caste, task.id, accumulatedText, task.files);
+    const pheromones = extractPheromones(antId, antConfig.caste, task.id, accumulatedText, task.files, true);
     for (const p of pheromones) nest.dropPheromone(p);
 
     nest.updateTaskStatus(task.id, "failed", accumulatedText, errStr);
