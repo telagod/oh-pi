@@ -36,10 +36,13 @@
 
 ## 使用方式
 
+### 使用方式
+
+LLM 在判断任务复杂度足够时会自动调用 `ant_colony` tool，无需手动触发。
+
 ### 命令
 
 ```
-/colony <目标描述>          启动蚁群
 /colony-stop                中止运行中的蚁群
 Ctrl+Shift+A                展开蚁群详情面板
 ```
@@ -110,4 +113,4 @@ npx oh-pi  # 选择 Full Power 预设
 | `concurrency.ts` | 115 | 自适应并发：系统采样，探索/稳态双阶段调节 |
 | `spawner.ts` | 316 | 蚂蚁孵化：进程管理，prompt 构建，输出解析 |
 | `queen.ts` | 331 | 女王调度：生命周期，任务波次，多轮迭代 |
-| `index.ts` | 324 | 扩展入口：command/shortcut 注册，TUI 渲染 |
+| `index.ts` | 324 | 扩展入口：tool/shortcut 注册，TUI 渲染 |

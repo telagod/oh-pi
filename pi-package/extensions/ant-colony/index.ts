@@ -13,6 +13,7 @@ import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text, Container, Spacer, matchesKey } from "@mariozechner/pi-tui";
+import { Type } from "@sinclair/typebox";
 import { runColony, type QueenCallbacks } from "./queen.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
 
@@ -466,40 +467,94 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     },
   });
 
-  // ═══ Command: /colony ═══
-  pi.registerCommand("colony", {
-    description: "Launch an ant colony with a goal. Usage: /colony <goal>",
-    async handler(args, ctx) {
-      const goal = args.trim();
-      if (!goal) {
-        ctx.ui.notify("Usage: /colony <goal>", "warning");
-        return;
+  // ═══ Tool: ant_colony ═══
+  pi.registerTool({
+    name: "ant_colony",
+    label: "Ant Colony",
+    description: [
+      "Launch an autonomous ant colony in the BACKGROUND to accomplish a complex goal.",
+      "The colony runs asynchronously — you can continue chatting while it works.",
+      "Results are automatically injected when the colony finishes.",
+      "Scouts explore the codebase, workers execute tasks in parallel, soldiers review quality.",
+      "Use for multi-file changes, large refactors, or complex features.",
+    ].join(" "),
+    parameters: Type.Object({
+      goal: Type.String({ description: "What the colony should accomplish" }),
+      maxAnts: Type.Optional(Type.Number({ description: "Max concurrent ants (default: auto-adapt)", minimum: 1, maximum: 8 })),
+      maxCost: Type.Optional(Type.Number({ description: "Max cost budget in USD (default: unlimited)", minimum: 0.01 })),
+      scoutModel: Type.Optional(Type.String({ description: "Model for scout ants (default: current session model)" })),
+      workerModel: Type.Optional(Type.String({ description: "Model for worker ants (default: current session model)" })),
+      soldierModel: Type.Optional(Type.String({ description: "Model for soldier ants (default: current session model)" })),
+    }),
+
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      if (activeColony) {
+        return {
+          content: [{ type: "text", text: "A colony is already running in the background. Use /colony-stop to cancel it first." }],
+          isError: true,
+        };
       }
 
       const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
       if (!currentModel) {
-        ctx.ui.notify("No model available in current session", "error");
-        return;
+        return {
+          content: [{ type: "text", text: "Colony failed: no model available in current session" }],
+          isError: true,
+        };
       }
 
+      const modelOverrides: Record<string, string> = {};
+      if (params.scoutModel) modelOverrides.scout = params.scoutModel;
+      if (params.workerModel) modelOverrides.worker = params.workerModel;
+      if (params.soldierModel) modelOverrides.soldier = params.soldierModel;
+
       const colonyParams = {
-        goal,
+        goal: params.goal,
+        maxAnts: params.maxAnts,
+        maxCost: params.maxCost,
         currentModel,
-        modelOverrides: {},
+        modelOverrides,
         cwd: ctx.cwd,
         modelRegistry: ctx.modelRegistry ?? undefined,
       };
 
+      // 非交互模式（print mode）：同步等待蚁群完成
       if (!ctx.hasUI) {
-        const result = await runSyncColony(colonyParams);
-        if (result.isError) {
-          ctx.ui.notify("Colony failed", "error");
-        }
-        return;
+        return await runSyncColony(colonyParams, _signal);
       }
 
+      // 交互模式：后台运行
       launchBackgroundColony(colonyParams);
-      ctx.ui.notify(`🐜 Colony launched: ${goal.slice(0, 50)}`, "success");
+
+      return {
+        content: [{ type: "text", text: `[COLONY_SIGNAL:LAUNCHED]\n🐜 Colony launched in background.\nGoal: ${params.goal}\n\nThe colony is now running autonomously. Results will be injected when it finishes.` }],
+      };
+    },
+
+    renderCall(args, theme) {
+      const goal = args.goal?.length > 70 ? args.goal.slice(0, 67) + "..." : args.goal;
+      let text = theme.fg("toolTitle", theme.bold("🐜 ant_colony"));
+      if (args.maxAnts) text += theme.fg("muted", ` ×${args.maxAnts}`);
+      if (args.maxCost) text += theme.fg("warning", ` $${args.maxCost}`);
+      text += "\n" + theme.fg("dim", `  ${goal || "..."}`);
+      return new Text(text, 0, 0);
+    },
+
+    renderResult(result, { expanded }, theme) {
+      const text = result.content?.find((c: any) => c.type === "text")?.text || "";
+      if (result.isError) {
+        return new Text(theme.fg("error", text), 0, 0);
+      }
+      const container = new Container();
+      container.addChild(new Text(
+        theme.fg("success", "✓ ") + theme.fg("toolTitle", theme.bold("Colony launched in background")),
+        0, 0,
+      ));
+      if (activeColony) {
+        container.addChild(new Text(theme.fg("dim", `  Goal: ${activeColony.goal.slice(0, 70)}`), 0, 0));
+        container.addChild(new Text(theme.fg("muted", `  Ctrl+Shift+A for details │ /colony-stop to cancel`), 0, 0));
+      }
+      return container;
     },
   });
 

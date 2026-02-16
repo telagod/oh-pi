@@ -102,7 +102,7 @@ oh-pi:
 
 ```
 pi（主进程）
-  └─ /colony 命令
+  └─ ant_colony tool
        └─ queen.ts → runColony()
             └─ spawnAnt() → createAgentSession()
                  ├─ session.subscribe() → 实时 token 流
