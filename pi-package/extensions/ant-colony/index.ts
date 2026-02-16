@@ -60,7 +60,6 @@ interface BackgroundColony {
   abortController: AbortController;
   state: ColonyState | null;
   phase: string;
-  log: string[];
   antStreams: Map<string, AntStreamState>;
   promise: Promise<ColonyState>;
 }
@@ -84,20 +83,13 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     pi.events.on("ant-colony:render", () => {
       if (!activeColony) return;
-      const { state, antStreams } = activeColony;
-      const active = antStreams.size;
+      const { state } = activeColony;
       const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
       const m = state?.metrics;
       const colonyStatus = state?.status || "scouting";
-      const ants = state?.ants || [];
-      const turns = ants.reduce((s, a) => s + a.usage.turns, 0);
-      const outTok = ants.reduce((s, a) => s + a.usage.output, 0);
 
       const parts = [`🐜 ${statusIcon(colonyStatus)}`];
       if (m) parts.push(`${m.tasksDone}/${m.tasksTotal}`);
-      parts.push(`${active}⚡`);
-      parts.push(`${turns}↻`);
-      parts.push(formatTokens(outTok) + "↑");
       if (m) parts.push(formatCost(m.totalCost));
       parts.push(elapsed);
 
@@ -129,18 +121,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       appendFileSync(gitignorePath, `${gitContent.length && !gitContent.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
     }
 
-    const log: string[] = [];
-    const callbacks: QueenCallbacks = {
-      onPhase(_phase, detail) { log.push(detail); },
-      onAntSpawn(ant, task) { log.push(`  ${casteIcon(ant.caste)} ${ant.caste} → ${task.title.slice(0, 50)}`); },
-      onAntDone(ant, task) {
-        const dur = ant.finishedAt ? formatDuration(ant.finishedAt - ant.startedAt) : "?";
-        log.push(`  ${ant.status === "done" ? "✓" : "✗"} ${ant.caste} (${dur}) → ${task.title.slice(0, 50)}`);
-      },
-      onAntStream() {},
-      onProgress() {},
-      onComplete() {},
-    };
+    const callbacks: QueenCallbacks = {};
 
     try {
       const state = await runColony({
@@ -160,14 +141,14 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       const report = [
         `## 🐜 Ant Colony Report`,
         `**Goal:** ${state.goal}`,
-        `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed}`,
-        `**Metrics:** ${m.tasksDone}/${m.tasksTotal} tasks │ ${m.antsSpawned} ants │ ${formatTokens(m.totalTokens)} │ ${formatCost(m.totalCost)}`,
+        `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed} │ ${formatCost(m.totalCost)}`,
+        `**Tasks:** ${m.tasksDone}/${m.tasksTotal} done${m.tasksFailed > 0 ? `, ${m.tasksFailed} failed` : ""}`,
         ``,
         ...state.tasks.filter(t => t.status === "done").map(t =>
-          `- ✓ **${t.title}**${t.result ? `: ${t.result.split("\n")[0]?.slice(0, 100)}` : ""}`
+          `- ✓ **${t.title}**`
         ),
         ...state.tasks.filter(t => t.status === "failed").map(t =>
-          `- ✗ **${t.title}** — ${t.error?.slice(0, 100) || "unknown"}`
+          `- ✗ **${t.title}** — ${t.error?.slice(0, 80) || "unknown"}`
         ),
       ].join("\n");
 
@@ -205,32 +186,27 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       abortController,
       state: null,
       phase: "initializing",
-      log: [],
       antStreams: new Map(),
       promise: null as any, // set below
     };
 
     const callbacks: QueenCallbacks = {
+      onSignal(signal) {
+        colony.phase = signal.message;
+        throttledRender();
+      },
       onPhase(phase, detail) {
         colony.phase = detail;
-        colony.log.push(`[${new Date().toLocaleTimeString()}] ${statusIcon(phase)} ${detail}`);
         throttledRender();
       },
       onAntSpawn(ant, task) {
         colony.antStreams.set(ant.id, {
-          antId: ant.id,
-          caste: ant.caste,
-          lastLine: "starting...",
-          tokens: 0,
+          antId: ant.id, caste: ant.caste, lastLine: "starting...", tokens: 0,
         });
-        colony.log.push(`  ${casteIcon(ant.caste)} ${ant.caste} ant dispatched → ${task.title.slice(0, 50)}`);
         throttledRender();
       },
-      onAntDone(ant, task) {
+      onAntDone(ant) {
         colony.antStreams.delete(ant.id);
-        const dur = ant.finishedAt ? formatDuration(ant.finishedAt - ant.startedAt) : "?";
-        const icon = ant.status === "done" ? "✓" : "✗";
-        colony.log.push(`  ${icon} ${ant.caste} finished (${dur}, ${formatCost(ant.usage.cost)}) → ${task.title.slice(0, 50)}`);
         throttledRender();
       },
       onAntStream(event: AntStreamEvent) {
@@ -240,7 +216,6 @@ export default function antColonyExtension(pi: ExtensionAPI) {
           const lines = event.totalText.split("\n").filter(l => l.trim());
           stream.lastLine = lines[lines.length - 1]?.trim() || "...";
         }
-        throttledRender();
       },
       onProgress(metrics) {
         if (colony.state) colony.state.metrics = metrics;
@@ -285,25 +260,15 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
       const report = [
         `## 🐜 Ant Colony Report`,
-        ``,
         `**Goal:** ${state.goal}`,
-        `**Status:** ${statusIcon(state.status)} ${state.status}`,
-        `**Duration:** ${elapsed}`,
-        ...(state.maxCost != null ? [`**Budget:** ${formatCost(m.totalCost)} / ${formatCost(state.maxCost)}`] : []),
+        `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed} │ ${formatCost(m.totalCost)}`,
+        `**Tasks:** ${m.tasksDone}/${m.tasksTotal} done${m.tasksFailed > 0 ? `, ${m.tasksFailed} failed` : ""}`,
         ``,
-        `### Metrics`,
-        `- Tasks: ${m.tasksDone}/${m.tasksTotal} done, ${m.tasksFailed} failed`,
-        `- Ants spawned: ${m.antsSpawned}`,
-        `- Tokens: ${formatTokens(m.totalTokens)}`,
-        `- Cost: ${formatCost(m.totalCost)}`,
-        `- Peak concurrency: ${state.concurrency.optimal}`,
-        ``,
-        `### Task Results`,
         ...state.tasks.filter(t => t.status === "done").map(t =>
-          `- ✓ **${t.title}** (${t.caste})${t.result ? `\n  ${t.result.split("\n")[0]?.slice(0, 100)}` : ""}`
+          `- ✓ **${t.title}**`
         ),
         ...state.tasks.filter(t => t.status === "failed").map(t =>
-          `- ✗ **${t.title}** — ${t.error?.slice(0, 100) || "unknown error"}`
+          `- ✗ **${t.title}** — ${t.error?.slice(0, 80) || "unknown"}`
         ),
       ].join("\n");
 
@@ -420,20 +385,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
           // ── Active Ants ──
           const streams = Array.from(c.antStreams.values());
           if (streams.length > 0) {
-            lines.push(theme.fg("accent", "  Active Ants"));
-            for (const s of streams) {
-              const line = s.lastLine.length > w - 20 ? s.lastLine.slice(0, w - 23) + "..." : s.lastLine;
-              lines.push(`  ${casteIcon(s.caste)} ${theme.fg("accent", s.antId.slice(0, 14))} ${theme.fg("dim", `${s.tokens}tok`)} ${theme.fg("muted", "▸")} ${line}`);
-            }
+            lines.push(theme.fg("accent", `  Active: ${streams.length} ants working`));
             lines.push("");
-          }
-
-          // ── Log (last 8) ──
-          if (c.log.length > 0) {
-            lines.push(theme.fg("accent", "  Log"));
-            for (const l of c.log.slice(-8)) {
-              lines.push(theme.fg("dim", `  ${l.slice(0, w - 2)}`));
-            }
           }
 
           lines.push("");
@@ -566,38 +519,14 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     const state = c.state;
     const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
     const m = state?.metrics;
-    const tasks = state?.tasks || [];
-    const ants = state?.ants || [];
-    const streams = Array.from(c.antStreams.values());
+    const phase = state?.status || "scouting";
 
     const lines: string[] = [
-      `## 🐜 Colony Status`,
-      `**Goal:** ${c.goal}`,
-      `**Phase:** ${c.phase}`,
-      `**Duration:** ${elapsed}`,
+      `🐜 ${statusIcon(phase)} ${c.goal.slice(0, 80)}`,
+      `${phase} │ ${m ? `${m.tasksDone}/${m.tasksTotal} tasks` : "starting"} │ ${m ? formatCost(m.totalCost) : "$0"} │ ${elapsed}`,
     ];
 
-    if (m) {
-      lines.push(`**Tasks:** ${m.tasksDone}/${m.tasksTotal} done, ${m.tasksFailed} failed`);
-      lines.push(`**Ants spawned:** ${m.antsSpawned} | **Active:** ${streams.length}`);
-      lines.push(`**Cost:** ${formatCost(m.totalCost)} | **Tokens:** ${formatTokens(m.totalTokens)}`);
-    }
-
-    if (tasks.length > 0) {
-      lines.push("", "### Tasks");
-      for (const t of tasks) {
-        const icon = t.status === "done" ? "✓" : t.status === "failed" ? "✗" : t.status === "active" ? "●" : "○";
-        const dur = t.finishedAt && t.startedAt ? ` (${formatDuration(t.finishedAt - t.startedAt)})` : "";
-        lines.push(`- ${icon} [${t.caste}] ${t.title}${dur}`);
-      }
-    }
-
-    if (streams.length > 0) {
-      lines.push("", "### Active Ants");
-      for (const s of streams) {
-        lines.push(`- ${casteIcon(s.caste)} ${s.antId.slice(0, 14)} | ${s.tokens}tok | ${s.lastLine.slice(0, 60)}`);
-      }
-    }
+    if (m && m.tasksFailed > 0) lines.push(`⚠ ${m.tasksFailed} failed`);
 
     return lines.join("\n");
   }

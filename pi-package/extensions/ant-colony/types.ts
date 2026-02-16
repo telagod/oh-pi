@@ -132,3 +132,12 @@ export interface ColonyMetrics {
   startTime: number;
   throughputHistory: number[];  // tasks/min 滑动窗口
 }
+
+/** 蚁群抽象信号 — 观察者只需关注这一个 */
+export interface ColonySignal {
+  phase: ColonyState["status"];
+  progress: number;       // 0-1
+  active: number;         // 当前工作中的蚂蚁数
+  cost: number;
+  message: string;        // 一句话描述
+}

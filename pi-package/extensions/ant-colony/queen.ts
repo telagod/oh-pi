@@ -15,7 +15,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
-  ColonyState, Task, Ant, AntCaste, ColonyMetrics,
+  ColonyState, Task, Ant, AntCaste, ColonyMetrics, ColonySignal,
   ConcurrencyConfig, TaskPriority, ModelOverrides, AntStreamEvent,
 } from "./types.js";
 import { DEFAULT_ANT_CONFIGS } from "./types.js";
@@ -26,12 +26,15 @@ import { buildImportGraph, taskDependsOn, type ImportGraph } from "./deps.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 
 export interface QueenCallbacks {
-  onPhase(phase: ColonyState["status"], detail: string): void;
-  onAntSpawn(ant: Ant, task: Task): void;
-  onAntDone(ant: Ant, task: Task, output: string): void;
+  /** 抽象信号 — 观察者只需实现这一个 */
+  onSignal?(signal: ColonySignal): void;
+  /** 以下为细粒度回调（verbose 模式，可选） */
+  onPhase?(phase: ColonyState["status"], detail: string): void;
+  onAntSpawn?(ant: Ant, task: Task): void;
+  onAntDone?(ant: Ant, task: Task, output: string): void;
   onAntStream?(event: AntStreamEvent): void;
-  onProgress(metrics: ColonyMetrics): void;
-  onComplete(state: ColonyState): void;
+  onProgress?(metrics: ColonyMetrics): void;
+  onComplete?(state: ColonyState): void;
 }
 
 export interface QueenOptions {
@@ -176,13 +179,13 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
       usage: { input: 0, output: 0, cost: 0, turns: 0 },
       startedAt: Date.now(), finishedAt: null,
     };
-    callbacks.onAntSpawn(ant, task);
+    callbacks.onAntSpawn?.(ant, task);
 
     try {
       const result = caste === "drone"
         ? await runDrone(cwd, nest, task)
         : await spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
-      callbacks.onAntDone(result.ant, task, result.output);
+      callbacks.onAntDone?.(result.ant, task, result.output);
 
       if (result.rateLimited) {
         return "rate_limited";
@@ -207,7 +210,8 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
 
       // 更新指标
       const metrics = updateMetrics(nest);
-      callbacks.onProgress(metrics);
+      callbacks.onProgress?.(metrics);
+      emitSignal("working", `${metrics.tasksDone}/${metrics.tasksTotal} tasks done`);
 
       return "done";
     } catch (e) {
@@ -230,7 +234,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok"> {
 
     // 429 退避：短暂等待后恢复，连续限流才逐步加长
     if (backoffMs > 0) {
-      callbacks.onPhase("working", `Rate limited (429). Waiting ${Math.round(backoffMs / 1000)}s...`);
+      callbacks.onPhase?.("working", `Rate limited (429). Waiting ${Math.round(backoffMs / 1000)}s...`);
       await new Promise(r => setTimeout(r, backoffMs));
     }
 
@@ -349,9 +353,17 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     } catch { /* ignore */ }
   };
 
+  const emitSignal = (phase: ColonyState["status"], message: string) => {
+    const m = nest.getState().metrics;
+    const active = nest.getState().ants.filter(a => a.status === "working").length;
+    const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
+    callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
+  };
+
   try {
     // ═══ Phase 1: 侦察（快速单次，不再多轮接力） ═══
-    callbacks.onPhase("scouting", "Dispatching scout ant to explore codebase...");
+    callbacks.onPhase?.("scouting", "Dispatching scout ant to explore codebase...");
+    emitSignal("scouting", "Exploring codebase...");
     await runAntWave({ ...waveBase, caste: "scout" });
 
     let workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
@@ -380,7 +392,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
         finishedAt: null,
       };
       nest.writeTask(relayTask);
-      callbacks.onPhase("scouting", "Scout relay: generating worker tasks...");
+      callbacks.onPhase?.("scouting", "Scout relay: generating worker tasks...");
+      emitSignal("scouting", "Retrying scout...");
       await runAntWave({ ...waveBase, caste: "scout" });
       workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
     }
@@ -388,7 +401,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     if (workerTasks.length === 0) {
       nest.updateState({ status: "failed", finishedAt: Date.now() });
       const finalState = nest.getState();
-      callbacks.onComplete(finalState);
+      callbacks.onComplete?.(finalState);
+      emitSignal("failed", "No tasks generated");
       return finalState;
     }
 
@@ -408,11 +422,13 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     // 先执行 drone 任务（零 LLM 成本）
     const droneTasks = nest.getAllTasks().filter(t => t.caste === "drone" && t.status === "pending");
     if (droneTasks.length > 0) {
-      callbacks.onPhase("working", `${droneTasks.length} drone tasks. Executing rules...`);
+      callbacks.onPhase?.("working", `${droneTasks.length} drone tasks. Executing rules...`);
+      emitSignal("working", `${droneTasks.length} drone tasks`);
       await runAntWave({ ...waveBase, caste: "drone" });
     }
 
-    callbacks.onPhase("working", `${workerTasks.length} tasks discovered. Dispatching worker ants...`);
+    callbacks.onPhase?.("working", `${workerTasks.length} tasks discovered. Dispatching worker ants...`);
+    emitSignal("working", `${workerTasks.length} tasks to do`);
     await runAntWave({ ...waveBase, caste: "worker" });
 
     // 处理工蚁产生的子任务（可能有多轮）
@@ -427,7 +443,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       );
       if (remaining.length === 0) break;
       rounds++;
-      callbacks.onPhase("working", `Round ${rounds + 1}: ${remaining.length} sub-tasks from workers...`);
+      callbacks.onPhase?.("working", `Round ${rounds + 1}: ${remaining.length} sub-tasks from workers...`);
       await runAntWave({ ...waveBase, caste: "worker" });
     }
 
@@ -444,7 +460,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     const completedWorkerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "done");
     if (completedWorkerTasks.length > 0 && (!tscPassed || completedWorkerTasks.length > 3)) {
       nest.updateState({ status: "reviewing" });
-      callbacks.onPhase("reviewing", "Dispatching soldier ants to review changes...");
+      callbacks.onPhase?.("reviewing", "Dispatching soldier ants to review changes...");
+      emitSignal("reviewing", "Reviewing changes...");
       const reviewTask = makeReviewTask(completedWorkerTasks);
       nest.writeTask(reviewTask);
       await runAntWave({ ...waveBase, caste: "soldier" });
@@ -455,7 +472,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
       );
       if (fixTasks.length > 0) {
         nest.updateState({ status: "working" });
-        callbacks.onPhase("working", `${fixTasks.length} fix tasks from review. Dispatching workers...`);
+        callbacks.onPhase?.("working", `${fixTasks.length} fix tasks from review. Dispatching workers...`);
         await runAntWave({ ...waveBase, caste: "worker" });
       }
     }
@@ -464,13 +481,15 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     const finalMetrics = updateMetrics(nest);
     nest.updateState({ status: "done", finishedAt: Date.now(), metrics: finalMetrics });
     const finalState = nest.getState();
-    callbacks.onComplete(finalState);
+    callbacks.onComplete?.(finalState);
+    emitSignal("done", `${finalMetrics.tasksDone}/${finalMetrics.tasksTotal} tasks done`);
     return finalState;
 
   } catch (e) {
     nest.updateState({ status: "failed", finishedAt: Date.now() });
     const failState = nest.getState();
-    callbacks.onComplete(failState);
+    callbacks.onComplete?.(failState);
+    emitSignal("failed", String(e).slice(0, 100));
     return failState;
   } finally {
     cleanup();
