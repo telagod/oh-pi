@@ -151,6 +151,7 @@ interface WaveOptions {
   modelOverrides?: ModelOverrides;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
+  emitSignal: (phase: ColonyState["status"], message: string) => void;
   authStorage?: AuthStorage;
   modelRegistry?: ModelRegistry;
   importGraph?: ImportGraph;
@@ -160,7 +161,7 @@ interface WaveOptions {
  * 并发执行一批蚂蚁，自适应调节并发度
  */
 async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
-  const { nest, cwd, caste, signal, callbacks, currentModel } = opts;
+  const { nest, cwd, caste, signal, callbacks, currentModel, emitSignal } = opts;
   const casteModel = opts.modelOverrides?.[caste] || currentModel;
   const config = { ...DEFAULT_ANT_CONFIGS[caste], model: casteModel };
 
@@ -371,7 +372,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   nest.init(initialState);
   const { signal, callbacks } = opts;
   const waveBase: Omit<WaveOptions, "caste"> & { importGraph?: ImportGraph } = {
-    nest, cwd: opts.cwd, signal, callbacks,
+    nest, cwd: opts.cwd, signal, callbacks, emitSignal,
     currentModel: opts.currentModel,
     modelOverrides: opts.modelOverrides,
     authStorage: opts.authStorage,
@@ -577,19 +578,20 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
   nest.restore();
 
   const { signal, callbacks } = opts;
-  const waveBase: Omit<WaveOptions, "caste"> = {
-    nest, cwd: opts.cwd, signal, callbacks,
-    currentModel: opts.currentModel,
-    modelOverrides: opts.modelOverrides,
-    authStorage: opts.authStorage,
-    modelRegistry: opts.modelRegistry,
-  };
 
   const emitSignal = (phase: ColonyState["status"], message: string) => {
     const m = nest.getState().metrics;
     const active = nest.getState().ants.filter(a => a.status === "working").length;
     const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
     callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
+  };
+
+  const waveBase: Omit<WaveOptions, "caste"> = {
+    nest, cwd: opts.cwd, signal, callbacks, emitSignal,
+    currentModel: opts.currentModel,
+    modelOverrides: opts.modelOverrides,
+    authStorage: opts.authStorage,
+    modelRegistry: opts.modelRegistry,
   };
 
   const cleanup = () => {
