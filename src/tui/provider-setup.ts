@@ -28,6 +28,8 @@ function isUnsafeUrl(urlStr: string): boolean {
     if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
     if (/^192\.168\./.test(host)) return true;
     if (/^0\./.test(host) || host === "0.0.0.0") return true;
+    if (host.includes(":") || host.startsWith("[")) return true;
+    if (/^169\.254\./.test(host)) return true;
     // Block non-https for remote hosts
     if (u.protocol !== "https:") return true;
     return false;

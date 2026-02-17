@@ -195,9 +195,10 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       const antPromise = caste === "drone"
         ? runDrone(cwd, nest, task)
         : spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
+      let timeoutId: ReturnType<typeof setTimeout>;
       const result = await Promise.race([
-        antPromise,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Ant timeout (5min)")), ANT_TIMEOUT)),
+        antPromise.finally(() => clearTimeout(timeoutId)),
+        new Promise<never>((_, reject) => { timeoutId = setTimeout(() => reject(new Error("Ant timeout (5min)")), ANT_TIMEOUT); }),
       ]);
       callbacks.onAntDone?.(result.ant, task, result.output);
 
@@ -288,7 +289,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
     }
 
     // 解除 blocked 任务（如果锁定文件和依赖文件都已释放）
-    const activeTasks = state.tasks.filter(t => t.status === "active");
+    const activeTasks = state.tasks.filter(t => t.status === "active" || t.status === "claimed");
     const activeFiles = new Set(activeTasks.flatMap(t => t.files));
     for (const t of state.tasks.filter(t => t.status === "blocked" && t.caste === caste)) {
       const fileConflict = t.files.some(f => activeFiles.has(f));
@@ -509,7 +510,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     // ═══ 持续探索：Worker 完成后检查是否有新发现，有则再派 Scout ═══
     const discoveries = nest.getAllPheromones().filter(p => p.type === "discovery");
     const allDone = nest.getAllTasks().filter(t => t.status === "done");
-    if (discoveries.length > allDone.length && nest.getState().maxCost != null) {
+    if (discoveries.length > allDone.length) {
       const spent = nest.getState().ants.reduce((s, a) => s + a.usage.cost, 0);
       if (spent < (nest.getState().maxCost ?? Infinity)) {
         callbacks.onPhase?.("scouting", "Re-exploring based on new discoveries...");
@@ -582,7 +583,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     emitSignal("failed", String(e).slice(0, 100));
     return failState;
   } finally {
-    cleanup();
+    const finalStatus = nest.getState().status;
+    if (finalStatus === "done") cleanup();
   }
 }
 
@@ -643,6 +645,20 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
       }
     }
 
+    // Soldier review for resumed colony
+    const completedWorkerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "done");
+    if (completedWorkerTasks.length > 0) {
+      nest.updateState({ status: "reviewing" });
+      const reviewTask = makeReviewTask(completedWorkerTasks);
+      nest.writeTask(reviewTask);
+      await runAntWave({ ...waveBase, caste: "soldier" });
+      const fixTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "pending" && t.parentId !== null);
+      if (fixTasks.length > 0) {
+        nest.updateState({ status: "working" });
+        await runAntWave({ ...waveBase, caste: "worker" });
+      }
+    }
+
     const finalMetrics = updateMetrics(nest);
     nest.updateState({ status: "done", finishedAt: Date.now(), metrics: finalMetrics });
     const finalState = nest.getState();
@@ -657,6 +673,7 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
     emitSignal("failed", String(e).slice(0, 100));
     return failState;
   } finally {
-    cleanup();
+    const finalStatus = nest.getState().status;
+    if (finalStatus === "done") cleanup();
   }
 }

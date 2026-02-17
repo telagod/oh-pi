@@ -1,6 +1,8 @@
 import type { AntCaste, Pheromone, PheromoneType } from "./types.js";
 import { makePheromoneId } from "./spawner.js";
 
+const VALID_CASTES = new Set(["scout", "worker", "soldier", "drone"]);
+
 export interface ParsedSubTask {
   title: string;
   description: string;
@@ -21,7 +23,7 @@ export function parseSubTasks(output: string): ParsedSubTask[] {
         title: String(t.title || "Untitled"),
         description: String(t.description || t.title || ""),
         files: Array.isArray(t.files) ? t.files.map(String) : String(t.files || "").split(",").map((f: string) => f.trim()).filter(Boolean),
-        caste: (String(t.caste || "worker") as AntCaste),
+        caste: (VALID_CASTES.has(String(t.caste)) ? String(t.caste) : "worker") as AntCaste,
         priority: (Math.min(5, Math.max(1, parseInt(String(t.priority || "3")))) as 1 | 2 | 3 | 4 | 5),
         context: t.context ? String(t.context) : undefined,
       }));
@@ -41,7 +43,7 @@ export function parseSubTasks(output: string): ParsedSubTask[] {
         title: m[1]?.trim() || "Untitled",
         description: m[2]?.trim() || m[1]?.trim() || "",
         files: (m[3]?.trim() || "").split(",").map((f: string) => f.trim()).filter(Boolean),
-        caste: (m[4]?.trim() as AntCaste) || "worker",
+        caste: (VALID_CASTES.has(m[4]?.trim() ?? "") ? m[4]!.trim() : "worker") as AntCaste,
         priority: (parseInt(m[5] || "3") as 1 | 2 | 3 | 4 | 5) || 3,
         context,
       });

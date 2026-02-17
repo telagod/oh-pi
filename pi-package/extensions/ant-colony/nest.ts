@@ -92,12 +92,14 @@ export class Nest {
   }
 
   claimTask(taskId: string, antId: string): boolean {
-    const task = this.getTask(taskId);
-    if (!task || task.status !== "pending") return false;
-    task.status = "claimed";
-    task.claimedBy = antId;
-    this.writeTask(task);
-    return true;
+    return this.withStateLock(() => {
+      const task = this.getTask(taskId);
+      if (!task || task.status !== "pending") return false;
+      task.status = "claimed";
+      task.claimedBy = antId;
+      this.writeTask(task);
+      return true;
+    });
   }
 
   updateTaskStatus(taskId: string, status: TaskStatus, result?: string, error?: string): void {
@@ -181,7 +183,7 @@ export class Nest {
     // 衰减 + 过滤弱信息素
     const beforeLen = this.pheromoneCache.length;
     this.pheromoneCache = this.pheromoneCache.filter(p => {
-      p.strength = p.strength * Math.pow(0.5, (now - p.createdAt) / HALF_LIFE);
+      p.strength = Math.pow(0.5, (now - p.createdAt) / HALF_LIFE);
       return p.strength > 0.05;
     });
     const hadGarbage = this.pheromoneCache.length < beforeLen;
