@@ -167,7 +167,8 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 
   let backoffMs = 0; // 429 退避时间
   let consecutiveRateLimits = 0; // 连续限流计数
-  const retriedTasks = new Set<string>(); // 防止重复重试
+  const retryCount = new Map<string, number>(); // taskId → retry count
+  const MAX_RETRIES = 2;
 
   const runOne = async (): Promise<"done" | "empty" | "rate_limited" | "budget"> => {
     // Budget 刹车：预算用完就不出发（drone 免费，不检查）
@@ -190,13 +191,27 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
     callbacks.onAntSpawn?.(ant, task);
 
     try {
-      const result = caste === "drone"
-        ? await runDrone(cwd, nest, task)
-        : await spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
+      const ANT_TIMEOUT = 5 * 60 * 1000; // 5 min hard timeout per ant
+      const antPromise = caste === "drone"
+        ? runDrone(cwd, nest, task)
+        : spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
+      const result = await Promise.race([
+        antPromise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Ant timeout (5min)")), ANT_TIMEOUT)),
+      ]);
       callbacks.onAntDone?.(result.ant, task, result.output);
 
       if (result.rateLimited) {
         return "rate_limited";
+      }
+
+      // 成本预警：超 80% 预算时发信号
+      const curState = nest.getState();
+      if (curState.maxCost != null) {
+        const spent = curState.ants.reduce((s, a) => s + a.usage.cost, 0);
+        if (spent >= curState.maxCost * 0.8) {
+          emitSignal("working", `Budget warning: ${(spent / curState.maxCost * 100).toFixed(0)}% used`);
+        }
       }
 
       // 蚂蚁产生的子任务加入巢穴（限制繁殖上限，防止任务膨胀）
@@ -237,8 +252,11 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 
       return "done";
     } catch (e) {
-      if (!retriedTasks.has(task.id)) {
-        retriedTasks.add(task.id);
+      const errStr = String(e);
+      const isRetryable = errStr.includes("timeout") || errStr.includes("Timeout") || errStr.includes("ECONNRESET") || errStr.includes("429");
+      const count = retryCount.get(task.id) ?? 0;
+      if (isRetryable && count < MAX_RETRIES) {
+        retryCount.set(task.id, count + 1);
         nest.updateTaskStatus(task.id, "pending");
       } else {
         // 负信息素：失败任务释放 warning，阻止后续蚂蚁走同一条路
@@ -321,12 +339,12 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       return "budget";
     }
 
-    // 429 处理：降低并发 + 渐进退避（2s → 5s → 10s，上限 10s）
+    // 429 处理：降低并发 + 渐进退避（2s → 5s → 10s，上限 10s）+ 记录时间戳
     if (results.includes("rate_limited")) {
       consecutiveRateLimits++;
       const cur = nest.getState().concurrency;
       const reduced = Math.max(cur.min, cur.current - 1); // 每次只减 1，不砍半
-      nest.updateState({ concurrency: { ...cur, current: reduced } });
+      nest.updateState({ concurrency: { ...cur, current: reduced, lastRateLimitAt: Date.now() } });
       backoffMs = Math.min(consecutiveRateLimits * 2000, 10000);
     } else {
       consecutiveRateLimits = 0;
@@ -389,8 +407,9 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   };
 
   const emitSignal = (phase: ColonyState["status"], message: string) => {
-    const m = nest.getState().metrics;
-    const active = nest.getState().ants.filter(a => a.status === "working").length;
+    const state = nest.getState();
+    const m = state.metrics;
+    const active = state.ants.filter(a => a.status === "working").length;
     const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
     callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
   };
@@ -580,8 +599,9 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
   const { signal, callbacks } = opts;
 
   const emitSignal = (phase: ColonyState["status"], message: string) => {
-    const m = nest.getState().metrics;
-    const active = nest.getState().ants.filter(a => a.status === "working").length;
+    const state = nest.getState();
+    const m = state.metrics;
+    const active = state.ants.filter(a => a.status === "working").length;
     const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
     callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
   };

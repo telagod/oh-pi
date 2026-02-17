@@ -113,6 +113,7 @@ export interface ConcurrencyConfig {
   max: number;
   optimal: number;       // 自适应计算的最优值
   history: ConcurrencySample[];
+  lastRateLimitAt?: number; // 最近一次 429 的时间戳
 }
 
 export interface ConcurrencySample {
