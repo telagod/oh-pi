@@ -120,7 +120,9 @@ export async function runDrone(
 
   try {
     const { execSync } = await import("node:child_process");
-    const cmd = task.description;
+    // 优先从 context 代码块提取 bash 命令，fallback 到 description
+    const ctxMatch = task.context?.match(/```(?:bash|sh)?\s*\n?([\s\S]*?)```/);
+    const cmd = ctxMatch?.[1]?.trim() || task.description;
     // 基本危险命令校验
     const DANGEROUS = /\brm\s+-rf\s+\/|mkfs\b|dd\s+if=|chmod\s+777\s+\/|>\s*\/dev\/sd/i;
     if (DANGEROUS.test(cmd)) {

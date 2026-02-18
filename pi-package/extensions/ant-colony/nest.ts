@@ -368,5 +368,13 @@ export class Nest {
         this.writeTask(task);
       }
     }
+    // 将 orphaned working/idle ants 标记为 failed
+    for (const ant of this.stateCache.ants) {
+      if (ant.status === "working" || ant.status === "idle") {
+        ant.status = "failed";
+        ant.finishedAt = Date.now();
+      }
+    }
+    this.writeJson(this.stateFile, this.stateCache);
   }
 }

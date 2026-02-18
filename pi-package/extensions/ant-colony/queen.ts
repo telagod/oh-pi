@@ -394,13 +394,6 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 
   nest.init(initialState);
   const { signal, callbacks } = opts;
-  const waveBase: Omit<WaveOptions, "caste"> & { importGraph?: ImportGraph } = {
-    nest, cwd: opts.cwd, signal, callbacks, emitSignal,
-    currentModel: opts.currentModel,
-    modelOverrides: opts.modelOverrides,
-    authStorage: opts.authStorage,
-    modelRegistry: opts.modelRegistry,
-  };
 
   const cleanup = () => {
     nest.destroy();
@@ -417,6 +410,14 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     const active = state.ants.filter(a => a.status === "working").length;
     const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
     callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
+  };
+
+  const waveBase: Omit<WaveOptions, "caste"> & { importGraph?: ImportGraph } = {
+    nest, cwd: opts.cwd, signal, callbacks, emitSignal,
+    currentModel: opts.currentModel,
+    modelOverrides: opts.modelOverrides,
+    authStorage: opts.authStorage,
+    modelRegistry: opts.modelRegistry,
   };
 
   try {
