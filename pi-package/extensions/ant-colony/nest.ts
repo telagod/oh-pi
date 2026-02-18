@@ -228,6 +228,18 @@ export class Nest {
     return this.pheromoneCache;
   }
 
+  /** 统计指定文件相关的 warning/repellent 信息素数量 */
+  countWarnings(files: string[]): number {
+    this.getAllPheromones();
+    let count = 0;
+    for (const f of files) {
+      for (const p of this.pheromoneByFile.get(f) ?? []) {
+        if (p.type === "warning" || p.type === "repellent") count++;
+      }
+    }
+    return count;
+  }
+
   /** 读取与特定文件相关的信息素摘要 */
   getPheromoneContext(files: string[], limit = 20): string {
     const relevant = this.getAllPheromones()

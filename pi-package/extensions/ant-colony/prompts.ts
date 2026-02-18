@@ -76,13 +76,19 @@ Output format (MUST follow exactly):
 PASS or FAIL with summary.`,
 };
 
-export function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, maxTurns?: number): string {
+export function buildPrompt(task: Task, pheromoneContext: string, castePrompt: string, maxTurns?: number, tandem?: { parentResult?: string; priorError?: string }): string {
   let prompt = castePrompt + "\n\n";
   if (maxTurns) {
     prompt += `## ⚠️ Turn Limit\nYou have a MAXIMUM of ${maxTurns} turns. Plan accordingly — reserve your LAST turn to output the structured result format above. Do NOT waste turns on unnecessary exploration.\n\n`;
   }
   if (pheromoneContext) {
     prompt += `## Colony Pheromone Trail (intelligence from other ants)\n${pheromoneContext}\n\n`;
+  }
+  if (tandem?.parentResult) {
+    prompt += `## Tandem Context (from parent task)\n${tandem.parentResult.slice(0, 3000)}\n\n`;
+  }
+  if (tandem?.priorError) {
+    prompt += `## ⚠️ Prior Attempt Failed\nA previous ant failed on this task. Learn from their mistake:\n${tandem.priorError.slice(0, 1500)}\n\n`;
   }
   prompt += `## Your Assignment\n**Task:** ${task.title}\n**Description:** ${task.description}\n`;
   if (task.files.length > 0) {

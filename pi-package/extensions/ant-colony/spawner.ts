@@ -181,9 +181,22 @@ export async function spawnAnt(
   nest.updateAnt(ant);
   nest.updateTaskStatus(task.id, "active");
 
+  // Bio 2: 任务难度感知 — 动态 maxTurns
+  const warnings = nest.countWarnings(task.files);
+  const difficultyTurns = Math.min(25, (antConfig.maxTurns || 15) + task.files.length + warnings * 2);
+  const effectiveMaxTurns = antConfig.caste === "drone" ? 1 : difficultyTurns;
+
+  // Bio 3: 串联觅食 — 继承父任务 result 和失败前任 error
+  const tandem: { parentResult?: string; priorError?: string } = {};
+  if (task.parentId) {
+    const parent = nest.getTask(task.parentId);
+    if (parent?.result) tandem.parentResult = parent.result;
+  }
+  if (task.error) tandem.priorError = task.error;
+
   const pheromoneCtx = nest.getPheromoneContext(task.files);
   const castePrompt = CASTE_PROMPTS[antConfig.caste];
-  const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, antConfig.maxTurns);
+  const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, effectiveMaxTurns, tandem);
 
   const auth = authStorage ?? new AuthStorage();
   const registry = modelRegistry ?? new ModelRegistry(auth);

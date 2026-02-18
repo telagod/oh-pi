@@ -98,6 +98,44 @@ function childTaskFromParsed(
   };
 }
 
+/**
+ * Bio 5: 蚁群投票 — 合并多 Scout 产生的重复任务
+ * 相同文件集合的任务合并，被多 Scout 提及的任务 priority 提升
+ */
+function quorumMergeTasks(nest: Nest): void {
+  const tasks = nest.getAllTasks().filter(t =>
+    (t.caste === "worker" || t.caste === "drone") && t.status === "pending"
+  );
+  if (tasks.length < 2) return;
+
+  // 按文件集合分组（排序后 join 作为 key）
+  const groups = new Map<string, Task[]>();
+  for (const t of tasks) {
+    const key = [...t.files].sort().join("|") || t.title;
+    const arr = groups.get(key) ?? [];
+    arr.push(t);
+    groups.set(key, arr);
+  }
+
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+    // 保留第一个，删除重复的，合并 description
+    const keeper = group[0];
+    // Quorum 达成：被多 Scout 提及 → priority 提升
+    keeper.priority = Math.max(1, keeper.priority - 1) as 1 | 2 | 3 | 4 | 5;
+    // 合并其他任务的 context 到 keeper
+    for (let i = 1; i < group.length; i++) {
+      const dup = group[i];
+      if (dup.context && dup.context !== keeper.context) {
+        keeper.context = (keeper.context || "") + "\n\n--- Additional scout context ---\n" + dup.context;
+      }
+      // 标记重复任务为 done（已合并）
+      nest.updateTaskStatus(dup.id, "done", `Merged into ${keeper.id} (quorum)`);
+    }
+    nest.writeTask(keeper);
+  }
+}
+
 function makeReviewTask(completedTasks: Task[]): Task {
   const files = [...new Set(completedTasks.flatMap(t => t.files))];
   return {
@@ -158,17 +196,33 @@ interface WaveOptions {
 }
 
 /**
+ * Bio 6: 尸体清理 — 错误模式分类
+ */
+function classifyError(errStr: string): string {
+  if (errStr.includes("TypeError") || errStr.includes("type") || errStr.includes("TS")) return "type_error";
+  if (errStr.includes("permission") || errStr.includes("401") || errStr.includes("EACCES")) return "permission";
+  if (errStr.includes("timeout") || errStr.includes("Timeout") || errStr.includes("ETIMEDOUT")) return "timeout";
+  if (errStr.includes("ENOENT") || errStr.includes("not found") || errStr.includes("Cannot find")) return "not_found";
+  if (errStr.includes("syntax") || errStr.includes("SyntaxError") || errStr.includes("Unexpected")) return "syntax";
+  if (errStr.includes("429") || errStr.includes("rate limit")) return "rate_limit";
+  return "unknown";
+}
+
+/**
  * 并发执行一批蚂蚁，自适应调节并发度
  */
 async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
   const { nest, cwd, caste, signal, callbacks, currentModel, emitSignal } = opts;
   const casteModel = opts.modelOverrides?.[caste] || currentModel;
-  const config = { ...DEFAULT_ANT_CONFIGS[caste], model: casteModel };
+  const baseConfig = { ...DEFAULT_ANT_CONFIGS[caste], model: casteModel };
 
   let backoffMs = 0; // 429 退避时间
   let consecutiveRateLimits = 0; // 连续限流计数
   const retryCount = new Map<string, number>(); // taskId → retry count
   const MAX_RETRIES = 2;
+
+  // Bio 6: 尸体清理 — 错误模式追踪
+  const errorPatterns = new Map<string, { count: number; files: Set<string>; errors: string[] }>();
 
   const runOne = async (): Promise<"done" | "empty" | "rate_limited" | "budget"> => {
     // Budget 刹车：预算用完就不出发（drone 免费，不检查）
@@ -176,6 +230,14 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
     if (state.maxCost != null && caste !== "drone") {
       const spent = state.ants.reduce((s, a) => s + a.usage.cost, 0);
       if (spent >= state.maxCost) return "budget";
+
+      // Bio 4: 巢穴温度 — 成本渐进调控
+      const temperature = spent / state.maxCost;
+      if (temperature > 0.9) {
+        // 紧急模式：只跑 priority 1 任务
+        const pending = state.tasks.filter(t => t.status === "pending" && t.caste === caste);
+        if (!pending.some(t => t.priority === 1)) return "budget";
+      }
     }
 
     const task = nest.claimNextTask(caste, "queen");
@@ -194,6 +256,14 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       const antAbort = new AbortController();
       signal?.addEventListener("abort", () => antAbort.abort(), { once: true });
       const antSignal = antAbort.signal;
+      // Bio 7: 年龄多态 — 前期保守，后期收敛
+      const progress = state.metrics.tasksTotal > 0 ? state.metrics.tasksDone / state.metrics.tasksTotal : 0;
+      const config = { ...baseConfig };
+      if (progress < 0.3) {
+        config.maxTurns = Math.max(baseConfig.maxTurns - 3, 5); // 前期保守
+      } else if (progress > 0.7) {
+        config.maxTurns = Math.max(baseConfig.maxTurns - 5, 5); // 后期收敛，只修复收尾
+      }
       const antPromise = caste === "drone"
         ? runDrone(cwd, nest, task)
         : spawnAnt(cwd, nest, task, config, antSignal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
@@ -220,8 +290,11 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       }
 
       // 蚂蚁产生的子任务加入巢穴（限制繁殖上限，防止任务膨胀）
+      // Bio 7: 年龄多态 — 后期限制子任务生成
+      const m = curState.metrics;
+      const colonyProgress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
       const MAX_TOTAL_TASKS = 30;
-      const MAX_SUB_PER_TASK = 5;
+      const MAX_SUB_PER_TASK = colonyProgress > 0.7 ? 2 : 5; // 后期收敛
       const accepted = result.newTasks.slice(0, MAX_SUB_PER_TASK);
       for (const sub of accepted) {
         if (nest.getAllTasks().length >= MAX_TOTAL_TASKS) break;
@@ -240,13 +313,14 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
         nest.addSubTask(task.id, child);
       }
 
-      // 路径强化：成功完成释放 completion 信息素，强化相关文件路径
+      // 路径强化：成功完成释放 completion 信息素，强度与任务规模成正比（招募信号）
       if (task.files.length > 0) {
+        const recruitStrength = Math.min(1.0, 0.5 + task.files.length * 0.1 + result.newTasks.length * 0.15);
         nest.dropPheromone({
           id: makePheromoneId(), type: "completion", antId: result.ant.id,
           antCaste: caste, taskId: task.id,
           content: `Success: ${task.title}`,
-          files: task.files, strength: 1.0, createdAt: Date.now(),
+          files: task.files, strength: recruitStrength, createdAt: Date.now(),
         });
       }
 
@@ -264,16 +338,49 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
         retryCount.set(task.id, count + 1);
         nest.updateTaskStatus(task.id, "pending");
       } else {
-        // 负信息素：失败任务释放 warning，阻止后续蚂蚁走同一条路
+        // 负信息素：失败任务释放 warning，强度与任务规模成正比
         if (task.files.length > 0) {
+          const warnStrength = Math.min(1.0, 0.5 + task.files.length * 0.1);
           nest.dropPheromone({
             id: makePheromoneId(), type: "warning", antId: "queen",
             antCaste: caste, taskId: task.id,
             content: `Failed: ${task.title} — ${String(e).slice(0, 100)}`,
-            files: task.files, strength: 1.0, createdAt: Date.now(),
+            files: task.files, strength: warnStrength, createdAt: Date.now(),
           });
         }
         nest.updateTaskStatus(task.id, "failed", undefined, String(e));
+
+        // Bio 6: 尸体清理 — 错误模式追踪 + 诊断任务
+        const pattern = classifyError(errStr);
+        const entry = errorPatterns.get(pattern) ?? { count: 0, files: new Set<string>(), errors: [] };
+        entry.count++;
+        for (const f of task.files) entry.files.add(f);
+        entry.errors.push(errStr.slice(0, 200));
+        errorPatterns.set(pattern, entry);
+
+        if (entry.count >= 2 && entry.files.size > 0) {
+          const affectedFiles = [...entry.files];
+          // 释放 repellent 信息素
+          nest.dropPheromone({
+            id: makePheromoneId(), type: "repellent", antId: "queen",
+            antCaste: caste, taskId: task.id,
+            content: `Recurring ${pattern} errors (${entry.count}x): ${entry.errors[0]?.slice(0, 80)}`,
+            files: affectedFiles, strength: 1.0, createdAt: Date.now(),
+          });
+          // 生成诊断任务（仅首次触发）
+          if (entry.count === 2 && nest.getAllTasks().length < 30) {
+            const diagTask: Task = {
+              id: makeTaskId(), parentId: null,
+              title: `Diagnose recurring ${pattern} errors`,
+              description: `Multiple ants failed with ${pattern} errors on these files:\n${affectedFiles.map(f => `- ${f}`).join("\n")}\n\nErrors:\n${entry.errors.map(e => `- ${e}`).join("\n")}\n\nInvestigate root cause and generate fix tasks.`,
+              caste: "scout", status: "pending", priority: 1,
+              files: affectedFiles, claimedBy: null, result: null, error: null,
+              spawnedTasks: [], createdAt: Date.now(), startedAt: null, finishedAt: null,
+            };
+            nest.writeTask(diagTask);
+            emitSignal("working", `Diagnosing recurring ${pattern} errors...`);
+          }
+        }
       }
       return "done";
     }
@@ -422,10 +529,37 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   };
 
   try {
-    // ═══ Phase 1: 侦察（快速单次，不再多轮接力） ═══
-    callbacks.onPhase?.("scouting", "Dispatching scout ant to explore codebase...");
-    emitSignal("scouting", "Exploring codebase...");
+    // ═══ Phase 1: 侦察（Bio 5: 蚁群投票 — 复杂目标派多 Scout） ═══
+    const scoutCount = opts.goal.length > 500 ? 3 : opts.goal.length > 200 ? 2 : 1;
+    if (scoutCount > 1) {
+      // 多 Scout 并行：为每只 Scout 创建独立任务
+      for (let i = 1; i < scoutCount; i++) {
+        const extraScout: Task = {
+          id: makeTaskId(),
+          parentId: null,
+          title: `Scout ${i + 1}: explore codebase for goal`,
+          description: `Explore the codebase from a different angle and identify files, modules, and dependencies relevant to this goal:\n\n${opts.goal}\n\nFocus on areas other scouts might miss. Be thorough.`,
+          caste: "scout",
+          status: "pending",
+          priority: 1,
+          files: [],
+          claimedBy: null,
+          result: null,
+          error: null,
+          spawnedTasks: [],
+          createdAt: Date.now(),
+          startedAt: null,
+          finishedAt: null,
+        };
+        nest.writeTask(extraScout);
+      }
+    }
+    callbacks.onPhase?.("scouting", `Dispatching ${scoutCount} scout ant(s) to explore codebase...`);
+    emitSignal("scouting", `${scoutCount} scouts exploring...`);
     await runAntWave({ ...waveBase, caste: "scout" });
+
+    // Bio 5: 合并多 Scout 产生的重复任务
+    if (scoutCount > 1) quorumMergeTasks(nest);
 
     let workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
 
@@ -514,11 +648,14 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     }
 
     // ═══ 持续探索：Worker 完成后检查是否有新发现，有则再派 Scout ═══
+    // Bio 4: 巢穴温度 — 超过 50% 预算禁止新 Scout 探索
     const discoveries = nest.getAllPheromones().filter(p => p.type === "discovery");
     const allDone = nest.getAllTasks().filter(t => t.status === "done");
-    if (discoveries.length > allDone.length) {
-      const spent = nest.getStateLight().ants.reduce((s, a) => s + a.usage.cost, 0);
-      if (spent < (nest.getStateLight().maxCost ?? Infinity)) {
+    const preExploreSpent = nest.getStateLight().ants.reduce((s, a) => s + a.usage.cost, 0);
+    const preExploreBudget = nest.getStateLight().maxCost ?? Infinity;
+    const costTemperature = preExploreSpent / preExploreBudget;
+    if (discoveries.length > allDone.length && costTemperature < 0.5) {
+      if (preExploreSpent < preExploreBudget) {
         callbacks.onPhase?.("scouting", "Re-exploring based on new discoveries...");
         emitSignal("scouting", "Re-exploring...");
         await runAntWave({ ...waveBase, caste: "scout" });
