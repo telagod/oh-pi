@@ -18,9 +18,18 @@ import { runColony, resumeColony, type QueenCallbacks } from "./queen.js";
 import { Nest } from "./nest.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
 
-import { formatDuration, formatCost, formatTokens, statusIcon, casteIcon } from "./ui.js";
+import { formatDuration, formatCost, formatTokens, statusIcon, casteIcon, buildReport } from "./ui.js";
 
 // ═══ Background colony state ═══
+
+/** Ensure .ant-colony/ is in .gitignore */
+function ensureGitignore(cwd: string) {
+  const gitignorePath = join(cwd, ".gitignore");
+  const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
+  if (!content.includes(".ant-colony/")) {
+    appendFileSync(gitignorePath, `${content.length && !content.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
+  }
+}
 
 interface AntStreamState {
   antId: string;
@@ -89,11 +98,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     cwd: string;
     modelRegistry?: any;
   }, signal?: AbortSignal | null) {
-    const gitignorePath = join(params.cwd, ".gitignore");
-    const gitContent = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
-    if (!gitContent.includes(".ant-colony/")) {
-      appendFileSync(gitignorePath, `${gitContent.length && !gitContent.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
-    }
+    ensureGitignore(params.cwd);
 
     const callbacks: QueenCallbacks = {};
 
@@ -110,24 +115,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         modelRegistry: params.modelRegistry,
       });
 
-      const m = state.metrics;
-      const elapsed = state.finishedAt ? formatDuration(state.finishedAt - state.createdAt) : "?";
-      const report = [
-        `## 🐜 Ant Colony Report`,
-        `**Goal:** ${state.goal}`,
-        `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed} │ ${formatCost(m.totalCost)}`,
-        `**Tasks:** ${m.tasksDone}/${m.tasksTotal} done${m.tasksFailed > 0 ? `, ${m.tasksFailed} failed` : ""}`,
-        ``,
-        ...state.tasks.filter(t => t.status === "done").map(t =>
-          `- ✓ **${t.title}**`
-        ),
-        ...state.tasks.filter(t => t.status === "failed").map(t =>
-          `- ✗ **${t.title}** — ${t.error?.slice(0, 80) || "unknown"}`
-        ),
-      ].join("\n");
-
       return {
-        content: [{ type: "text" as const, text: report }],
+        content: [{ type: "text" as const, text: buildReport(state) }],
         isError: state.status === "failed" || state.status === "budget_exceeded",
       };
     } catch (e) {
@@ -226,11 +215,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     };
 
     // Ensure .ant-colony/ is in .gitignore
-    const gitignorePath = join(params.cwd, ".gitignore");
-    const gitContent = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
-    if (!gitContent.includes(".ant-colony/")) {
-      appendFileSync(gitignorePath, `${gitContent.length && !gitContent.endsWith("\n") ? "\n" : ""}.ant-colony/\n`);
-    }
+    ensureGitignore(params.cwd);
 
     const colonyOpts = {
       cwd: params.cwd,
@@ -251,23 +236,9 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
     // 后台等待完成，注入结果
     colony.promise.then((state) => {
-      const m = state.metrics;
-      const elapsed = state.finishedAt ? formatDuration(state.finishedAt - state.createdAt) : "?";
       const ok = state.status === "done";
-
-      const report = [
-        `## 🐜 Ant Colony Report`,
-        `**Goal:** ${state.goal}`,
-        `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed} │ ${formatCost(m.totalCost)}`,
-        `**Tasks:** ${m.tasksDone}/${m.tasksTotal} done${m.tasksFailed > 0 ? `, ${m.tasksFailed} failed` : ""}`,
-        ``,
-        ...state.tasks.filter(t => t.status === "done").map(t =>
-          `- ✓ **${t.title}**`
-        ),
-        ...state.tasks.filter(t => t.status === "failed").map(t =>
-          `- ✗ **${t.title}** — ${t.error?.slice(0, 80) || "unknown"}`
-        ),
-      ].join("\n");
+      const report = buildReport(state);
+      const m = state.metrics;
 
       // 清理 UI
       pi.events.emit("ant-colony:clear-ui");
@@ -594,6 +565,14 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     if (activeColony) {
       activeColony.abortController.abort();
+      // Wait for colony to finish gracefully (max 5s)
+      try {
+        await Promise.race([
+          activeColony.promise,
+          new Promise(r => setTimeout(r, 5000)),
+        ]);
+      } catch { /* ignore */ }
+      pi.events.emit("ant-colony:clear-ui");
       activeColony = null;
     }
   });

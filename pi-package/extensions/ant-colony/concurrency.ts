@@ -76,18 +76,27 @@ export function adapt(config: ConcurrencyConfig, pendingTasks: number): Concurre
   const latest = samples[samples.length - 1];
   const prev = samples[samples.length - 2];
 
-  // 硬约束：系统过载立即减少
-  if (latest.cpuLoad > 0.85 || latest.memFree < 500 * 1024 * 1024) {
+  // CPU 滑动窗口：最近 3 次采样平均值
+  const recentCpuSamples = samples.slice(-3);
+  const avgCpu = recentCpuSamples.reduce((s, x) => s + x.cpuLoad, 0) / recentCpuSamples.length;
+
+  // 429 冷却：30s 内不允许增加并发
+  const inRateLimitCooldown = config.lastRateLimitAt != null && Date.now() - config.lastRateLimitAt < 30000;
+
+  // 硬约束：系统过载立即减少（滞回带：>85% 减，60%-85% 保持）
+  if (avgCpu > 0.85 || latest.memFree < 500 * 1024 * 1024) {
     next.current = Math.max(config.min, config.current - 1);
     return next;
   }
 
+  // 滞回带：CPU 在 60%-85% 之间保持不变
+  const canIncrease = avgCpu < 0.6 && !inRateLimitCooldown;
+
   // 探索期：样本不足，逐步提升
   if (samples.length < 10) {
-    if (latest.throughput >= prev.throughput) {
-      // 吞吐量还在涨，继续探索
+    if (latest.throughput >= prev.throughput && canIncrease) {
       next.current = Math.min(config.current + 1, taskCap);
-    } else {
+    } else if (latest.throughput < prev.throughput) {
       // 吞吐量下降，找到拐点
       next.optimal = prev.concurrency;
       next.current = prev.concurrency;
@@ -99,20 +108,17 @@ export function adapt(config: ConcurrencyConfig, pendingTasks: number): Concurre
   const recentThroughput = samples.slice(-5).reduce((s, x) => s + x.throughput, 0) / 5;
   const olderThroughput = samples.slice(-10, -5).reduce((s, x) => s + x.throughput, 0) / 5;
 
-  if (recentThroughput > olderThroughput * 1.1 && latest.cpuLoad < 0.7) {
-    // 吞吐量上升且 CPU 有余量，尝试+1
+  if (recentThroughput > olderThroughput * 1.1 && canIncrease) {
     next.current = Math.min(config.current + 1, taskCap);
     if (recentThroughput > olderThroughput * 1.2) {
-      next.optimal = next.current; // 更新最优值
+      next.optimal = next.current;
     }
   } else if (recentThroughput < olderThroughput * 0.8) {
-    // 吞吐量下降，回退
     next.current = Math.max(config.min, config.optimal);
   }
-  // 否则保持不变
 
   // 429 recovery: restore to optimal when CPU is underutilized (e.g. after backoff)
-  if (latest.cpuLoad < 0.5 && next.current < config.optimal) {
+  if (avgCpu < 0.5 && next.current < config.optimal && !inRateLimitCooldown) {
     next.current = config.optimal;
   }
 

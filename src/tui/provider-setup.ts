@@ -16,6 +16,26 @@ const PROVIDER_API_URLS: Record<string, string> = {
   mistral:    "https://api.mistral.ai",
 };
 
+/** Block internal/private IPs to prevent SSRF */
+function isUnsafeUrl(urlStr: string): boolean {
+  try {
+    const u = new URL(urlStr);
+    const host = u.hostname;
+    // Allow localhost for local dev servers (Ollama, vLLM, etc.)
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+    // Block private IP ranges
+    if (/^10\./.test(host)) return true;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
+    if (/^192\.168\./.test(host)) return true;
+    if (/^0\./.test(host) || host === "0.0.0.0") return true;
+    if (host.includes(":") || host.startsWith("[")) return true;
+    if (/^169\.254\./.test(host)) return true;
+    // Block non-https for remote hosts
+    if (u.protocol !== "https:") return true;
+    return false;
+  } catch { return true; }
+}
+
 interface FetchResult {
   models: DiscoveredModel[];
   api?: string;
@@ -95,7 +115,7 @@ async function fetchModels(provider: string, baseUrl: string, apiKey: string): P
           api: "openai-completions",
           models: data.map((m: any) => ({
             id: m.id,
-            reasoning: m.thinking_enabled ?? m.id.includes("o3") ?? false,
+            reasoning: m.thinking_enabled ?? m.id.includes("o3"),
             input: ["text", "image"] as ("text" | "image")[],
             contextWindow: m.context_window ?? m.max_tokens ?? 128000,
             maxTokens: m.max_output ?? 16384,
@@ -165,7 +185,7 @@ export async function setupProviders(env?: EnvInfo): Promise<ProviderConfig[]> {
       const url = await p.text({
         message: t("provider.baseUrl", { label: info.label }),
         placeholder: "https://proxy.example.com",
-        validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : undefined,
+        validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : isUnsafeUrl(v) ? "URL must use HTTPS for remote hosts (private IPs blocked)" : undefined,
       });
       if (p.isCancel(url)) { p.cancel(t("cancelled")); process.exit(0); }
       baseUrl = url;
@@ -206,7 +226,7 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
   const baseUrl = await p.text({
     message: t("provider.baseUrlCustom"),
     placeholder: t("provider.baseUrlCustomPlaceholder"),
-    validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : undefined,
+    validate: (v) => (!v || !v.startsWith("http")) ? t("provider.baseUrlValidation") : isUnsafeUrl(v) ? "URL must use HTTPS for remote hosts (private IPs blocked)" : undefined,
   });
   if (p.isCancel(baseUrl)) { p.cancel(t("cancelled")); process.exit(0); }
 

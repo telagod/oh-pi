@@ -121,6 +121,11 @@ export async function runDrone(
   try {
     const { execSync } = await import("node:child_process");
     const cmd = task.description;
+    // 基本危险命令校验
+    const DANGEROUS = /\brm\s+-rf\s+\/|mkfs\b|dd\s+if=|chmod\s+777\s+\/|>\s*\/dev\/sd/i;
+    if (DANGEROUS.test(cmd)) {
+      throw new Error(`Drone refused dangerous command: ${cmd.slice(0, 80)}`);
+    }
     const output = execSync(cmd, { cwd, encoding: "utf-8", timeout: 30000, stdio: "pipe" }).trim();
 
     ant.status = "done";
@@ -191,9 +196,10 @@ export async function spawnAnt(
 
   let accumulatedText = "";
   let rateLimited = false;
+  let session: any = null;
 
   try {
-    const { session } = await createAgentSession({
+    const created = await createAgentSession({
       cwd,
       model,
       thinkingLevel: "off",
@@ -204,6 +210,7 @@ export async function spawnAnt(
       sessionManager: SessionManager.inMemory(),
       settingsManager,
     });
+    session = created.session;
 
     session.subscribe((event: AgentSessionEvent) => {
       if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
@@ -241,8 +248,9 @@ export async function spawnAnt(
 
     const userPrompt = `Execute this task: ${task.title}\n\n${task.description}`;
 
+    let onAbort: (() => void) | undefined;
     if (signal) {
-      const onAbort = () => session.abort();
+      onAbort = () => session.abort();
       if (signal.aborted) {
         await session.abort();
       } else {
@@ -250,7 +258,13 @@ export async function spawnAnt(
       }
     }
 
-    await session.prompt(userPrompt);
+    try {
+      await session.prompt(userPrompt);
+    } finally {
+      if (signal && onAbort) {
+        signal.removeEventListener("abort", onAbort);
+      }
+    }
 
     const messages = session.messages;
     let finalOutput = accumulatedText;
@@ -278,7 +292,6 @@ export async function spawnAnt(
     for (const p of pheromones) nest.dropPheromone(p);
 
     nest.updateTaskStatus(task.id, "done", finalOutput);
-    session.dispose();
 
     return { ant, output: finalOutput, newTasks, pheromones, rateLimited: false };
 
@@ -305,5 +318,7 @@ export async function spawnAnt(
     nest.updateTaskStatus(task.id, "failed", accumulatedText, errStr);
 
     return { ant, output: accumulatedText, newTasks, pheromones, rateLimited: false };
+  } finally {
+    try { session?.dispose(); } catch { /* ignore dispose errors */ }
   }
 }

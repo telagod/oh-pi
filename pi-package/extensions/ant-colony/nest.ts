@@ -22,6 +22,8 @@ export class Nest {
   private pheromoneOffset: number = 0;
   private taskCache: Map<string, Task> = new Map();
   private stateCache: ColonyState | null = null;
+  private gcCounter: number = 0;
+  private pheromoneByFile: Map<string, Pheromone[]> = new Map();
 
   constructor(private cwd: string, private colonyId: string) {
     this.dir = path.join(cwd, ".ant-colony", colonyId);
@@ -90,12 +92,14 @@ export class Nest {
   }
 
   claimTask(taskId: string, antId: string): boolean {
-    const task = this.getTask(taskId);
-    if (!task || task.status !== "pending") return false;
-    task.status = "claimed";
-    task.claimedBy = antId;
-    this.writeTask(task);
-    return true;
+    return this.withStateLock(() => {
+      const task = this.getTask(taskId);
+      if (!task || task.status !== "pending") return false;
+      task.status = "claimed";
+      task.claimedBy = antId;
+      this.writeTask(task);
+      return true;
+    });
   }
 
   updateTaskStatus(taskId: string, status: TaskStatus, result?: string, error?: string): void {
@@ -129,15 +133,21 @@ export class Nest {
       return tasks[Math.floor(Math.random() * tasks.length)];
     }
 
-    // 信息素加权：discovery/completion 加分，warning/repellent 减分（负信息素）
-    const pheromones = this.getAllPheromones();
+    // 信息素加权：用索引查询而非全量扫描
+    this.getAllPheromones(); // 确保索引已建立
     const scored = tasks.map(t => {
       let pScore = 0;
-      for (const p of pheromones) {
-        if (!p.files.some(f => t.files.includes(f)) || p.strength <= 0.1) continue;
-        if (p.type === "discovery" || p.type === "completion") pScore += p.strength;
-        else if (p.type === "repellent") pScore -= p.strength * 3;  // repellent 负信息素惩罚最重
-        else if (p.type === "warning") pScore -= p.strength;
+      const seen = new Set<Pheromone>();
+      for (const f of t.files) {
+        const related = this.pheromoneByFile.get(f);
+        if (!related) continue;
+        for (const p of related) {
+          if (seen.has(p) || p.strength <= 0.1) continue;
+          seen.add(p);
+          if (p.type === "discovery" || p.type === "completion") pScore += p.strength;
+          else if (p.type === "repellent") pScore -= p.strength * 3;
+          else if (p.type === "warning") pScore -= p.strength;
+        }
       }
       return { task: t, score: (6 - t.priority) + pScore };
     });
@@ -171,10 +181,32 @@ export class Nest {
     }
 
     // 衰减 + 过滤弱信息素
+    const beforeLen = this.pheromoneCache.length;
     this.pheromoneCache = this.pheromoneCache.filter(p => {
-      p.strength = p.strength * Math.pow(0.5, (now - p.createdAt) / HALF_LIFE);
+      p.strength = Math.pow(0.5, (now - p.createdAt) / HALF_LIFE);
       return p.strength > 0.05;
     });
+    const hadGarbage = this.pheromoneCache.length < beforeLen;
+
+    // 重建文件索引
+    this.pheromoneByFile.clear();
+    for (const p of this.pheromoneCache) {
+      for (const f of p.files) {
+        let arr = this.pheromoneByFile.get(f);
+        if (!arr) { arr = []; this.pheromoneByFile.set(f, arr); }
+        arr.push(p);
+      }
+    }
+
+    // GC：每 10 次调用，若有弱条目被过滤则重写文件
+    this.gcCounter++;
+    if (this.gcCounter >= 10 && hadGarbage) {
+      this.gcCounter = 0;
+      const tmp = this.pheromoneFile + ".tmp";
+      fs.writeFileSync(tmp, this.pheromoneCache.map(p => JSON.stringify(p)).join("\n") + (this.pheromoneCache.length ? "\n" : ""));
+      fs.renameSync(tmp, this.pheromoneFile);
+      this.pheromoneOffset = fs.statSync(this.pheromoneFile).size;
+    }
 
     return this.pheromoneCache;
   }
@@ -234,15 +266,20 @@ export class Nest {
     const start = Date.now();
     while (true) {
       try {
-        fs.writeFileSync(this.lockFile, `${process.pid}`, { flag: "wx" });
+        fs.writeFileSync(this.lockFile, `${process.pid}:${Date.now()}`, { flag: "wx" });
         break;
       } catch {
         if (Date.now() - start > MAX_WAIT) {
-          // 超时：检查锁持有者是否存活
           try {
-            const holder = parseInt(fs.readFileSync(this.lockFile, "utf-8"), 10);
-            try { process.kill(holder, 0); } catch { /* 进程已死，清除死锁 */ fs.unlinkSync(this.lockFile); continue; }
-          } catch { /* 读取失败，强制清除 */ try { fs.unlinkSync(this.lockFile); } catch {} }
+            const content = fs.readFileSync(this.lockFile, "utf-8");
+            const [pidStr, tsStr] = content.split(":");
+            const holder = parseInt(pidStr, 10);
+            const lockTime = parseInt(tsStr, 10);
+            // 超过 30s 的锁视为过期
+            if (lockTime && Date.now() - lockTime > 30_000) { fs.unlinkSync(this.lockFile); continue; }
+            // 进程存活检查作为第二道防线
+            try { process.kill(holder, 0); } catch { fs.unlinkSync(this.lockFile); continue; }
+          } catch { try { fs.unlinkSync(this.lockFile); } catch {} }
           continue;
         }
         // 简单 busy-wait，避免 SharedArrayBuffer 依赖
