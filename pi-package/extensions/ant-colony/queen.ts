@@ -102,7 +102,7 @@ function childTaskFromParsed(
  * Bio 5: 蚁群投票 — 合并多 Scout 产生的重复任务
  * 相同文件集合的任务合并，被多 Scout 提及的任务 priority 提升
  */
-function quorumMergeTasks(nest: Nest): void {
+export function quorumMergeTasks(nest: Nest): void {
   const tasks = nest.getAllTasks().filter(t =>
     (t.caste === "worker" || t.caste === "drone") && t.status === "pending"
   );
@@ -198,7 +198,7 @@ interface WaveOptions {
 /**
  * Bio 6: 尸体清理 — 错误模式分类
  */
-function classifyError(errStr: string): string {
+export function classifyError(errStr: string): string {
   if (errStr.includes("TypeError") || errStr.includes("type") || errStr.includes("TS")) return "type_error";
   if (errStr.includes("permission") || errStr.includes("401") || errStr.includes("EACCES")) return "permission";
   if (errStr.includes("timeout") || errStr.includes("Timeout") || errStr.includes("ETIMEDOUT")) return "timeout";

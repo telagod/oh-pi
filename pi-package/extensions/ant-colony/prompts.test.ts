@@ -54,4 +54,46 @@ describe("buildPrompt", () => {
     const r = buildPrompt(mkTask({ description: "修复登录问题" }), "", "System");
     expect(r).toContain("Chinese");
   });
+
+  // Bio 3: 串联觅食 — tandem context
+  it("includes tandem parent result when provided", () => {
+    const r = buildPrompt(mkTask(), "", "System", 10, { parentResult: "Parent found auth module at src/auth.ts" });
+    expect(r).toContain("Tandem Context");
+    expect(r).toContain("Parent found auth module");
+  });
+
+  it("includes tandem prior error when provided", () => {
+    const r = buildPrompt(mkTask(), "", "System", 10, { priorError: "TypeError: cannot read property" });
+    expect(r).toContain("Prior Attempt Failed");
+    expect(r).toContain("TypeError: cannot read property");
+  });
+
+  it("includes both tandem fields when provided", () => {
+    const r = buildPrompt(mkTask(), "", "System", 10, {
+      parentResult: "Scout found files",
+      priorError: "Build failed",
+    });
+    expect(r).toContain("Tandem Context");
+    expect(r).toContain("Prior Attempt Failed");
+  });
+
+  it("omits tandem sections when not provided", () => {
+    const r = buildPrompt(mkTask(), "", "System", 10);
+    expect(r).not.toContain("Tandem Context");
+    expect(r).not.toContain("Prior Attempt Failed");
+  });
+
+  it("omits tandem sections when empty object", () => {
+    const r = buildPrompt(mkTask(), "", "System", 10, {});
+    expect(r).not.toContain("Tandem Context");
+    expect(r).not.toContain("Prior Attempt Failed");
+  });
+
+  it("truncates long parent result", () => {
+    const longResult = "x".repeat(5000);
+    const r = buildPrompt(mkTask(), "", "System", 10, { parentResult: longResult });
+    expect(r).toContain("Tandem Context");
+    // Should be truncated to 3000 chars
+    expect(r.length).toBeLessThan(longResult.length);
+  });
 });
