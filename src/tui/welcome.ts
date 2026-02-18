@@ -37,7 +37,7 @@ export function welcome(env: EnvInfo) {
  * @param {string[]} files - 文件相对路径列表
  * @returns {string} 分类统计字符串，如 "extensions (3)  prompts (5)"
  */
-function categorize(files: string[]): string {
+export function categorize(files: string[]): string {
   const cats: Record<string, number> = {};
   for (const f of files) {
     const cat = f.includes("/") ? f.split("/")[0] : f;

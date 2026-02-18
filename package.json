@@ -1,10 +1,10 @@
 {
   "name": "oh-pi",
-  "version": "0.1.70",
+  "version": "0.1.71",
   "description": "One-click setup for pi-coding-agent. Like oh-my-zsh for pi.",
   "type": "module",
   "bin": {
-    "oh-pi": "./dist/bin/oh-pi.js"
+    "oh-pi": "dist/bin/oh-pi.js"
   },
   "main": "./dist/index.js",
   "files": [
@@ -16,6 +16,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/bin/oh-pi.js",
+    "test": "vitest run",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -46,7 +47,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

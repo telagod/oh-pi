@@ -32,6 +32,8 @@ import { parseSubTasks, extractPheromones, type ParsedSubTask } from "./parser.j
 
 let antCounter = 0;
 
+export function resetAntCounter(): void { antCounter = 0; }
+
 export function makeAntId(caste: AntCaste): string {
   return `${caste}-${++antCounter}-${Date.now().toString(36)}`;
 }

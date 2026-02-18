@@ -51,6 +51,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
   // 当前运行中的后台蚁群（同时只允许一个）
   let activeColony: BackgroundColony | null = null;
+  let uiListenersRegistered = false;
 
   // ─── Status 渲染 ───
 
@@ -64,6 +65,9 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
   // 监听事件来更新 UI（确保在有 ctx 的上下文中）
   pi.on("session_start", async (_event, ctx) => {
+    if (uiListenersRegistered) return;
+    uiListenersRegistered = true;
+
     pi.events.on("ant-colony:render", () => {
       if (!activeColony) return;
       const { state } = activeColony;

@@ -20,7 +20,7 @@ import type {
 } from "./types.js";
 import { DEFAULT_ANT_CONFIGS } from "./types.js";
 import { Nest } from "./nest.js";
-import { spawnAnt, runDrone, makeTaskId, makePheromoneId } from "./spawner.js";
+import { spawnAnt, runDrone, makeTaskId, makePheromoneId, resetAntCounter } from "./spawner.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
 import { buildImportGraph, taskDependsOn, type ImportGraph } from "./deps.js";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
@@ -120,8 +120,8 @@ function makeReviewTask(completedTasks: Task[]): Task {
 }
 
 function updateMetrics(nest: Nest): ColonyMetrics {
-  const tasks = nest.getAllTasks();
-  const state = nest.getState();
+  const state = nest.getStateLight();
+  const tasks = state.tasks;
   const now = Date.now();
   const elapsed = (now - state.metrics.startTime) / 60000; // minutes
 
@@ -172,7 +172,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 
   const runOne = async (): Promise<"done" | "empty" | "rate_limited" | "budget"> => {
     // Budget 刹车：预算用完就不出发（drone 免费，不检查）
-    const state = nest.getState();
+    const state = nest.getStateLight();
     if (state.maxCost != null && caste !== "drone") {
       const spent = state.ants.reduce((s, a) => s + a.usage.cost, 0);
       if (spent >= state.maxCost) return "budget";
@@ -211,7 +211,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       }
 
       // 成本预警：超 80% 预算时发信号
-      const curState = nest.getState();
+      const curState = nest.getStateLight();
       if (curState.maxCost != null) {
         const spent = curState.ants.reduce((s, a) => s + a.usage.cost, 0);
         if (spent >= curState.maxCost * 0.8) {
@@ -282,7 +282,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
   // 调度循环：持续派蚂蚁直到没有待处理任务
   let lastSampleTime = 0;
   while (!signal?.aborted) {
-    const state = nest.getState();
+    const state = nest.getStateLight();
     const pending = state.tasks.filter(t => t.status === "pending" && t.caste === caste);
     if (pending.length === 0) break;
 
@@ -347,7 +347,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
     // 429 处理：降低并发 + 渐进退避（2s → 5s → 10s，上限 10s）+ 记录时间戳
     if (results.includes("rate_limited")) {
       consecutiveRateLimits++;
-      const cur = nest.getState().concurrency;
+      const cur = nest.getStateLight().concurrency;
       const reduced = Math.max(cur.min, cur.current - 1); // 每次只减 1，不砍半
       nest.updateState({ concurrency: { ...cur, current: reduced, lastRateLimitAt: Date.now() } });
       backoffMs = Math.min(consecutiveRateLimits * 2000, 10000);
@@ -366,6 +366,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   if (!opts.goal || !opts.goal.trim()) {
     throw new Error("Colony goal is empty or undefined. Please provide a clear goal.");
   }
+  resetAntCounter();
   const colonyId = makeColonyId();
   const nest = new Nest(opts.cwd, colonyId);
 
@@ -405,7 +406,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
   };
 
   const emitSignal = (phase: ColonyState["status"], message: string) => {
-    const state = nest.getState();
+    const state = nest.getStateLight();
     const m = state.metrics;
     const active = state.ants.filter(a => a.status === "working").length;
     const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;
@@ -516,8 +517,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     const discoveries = nest.getAllPheromones().filter(p => p.type === "discovery");
     const allDone = nest.getAllTasks().filter(t => t.status === "done");
     if (discoveries.length > allDone.length) {
-      const spent = nest.getState().ants.reduce((s, a) => s + a.usage.cost, 0);
-      if (spent < (nest.getState().maxCost ?? Infinity)) {
+      const spent = nest.getStateLight().ants.reduce((s, a) => s + a.usage.cost, 0);
+      if (spent < (nest.getStateLight().maxCost ?? Infinity)) {
         callbacks.onPhase?.("scouting", "Re-exploring based on new discoveries...");
         emitSignal("scouting", "Re-exploring...");
         await runAntWave({ ...waveBase, caste: "scout" });
@@ -606,7 +607,7 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
   const { signal, callbacks } = opts;
 
   const emitSignal = (phase: ColonyState["status"], message: string) => {
-    const state = nest.getState();
+    const state = nest.getStateLight();
     const m = state.metrics;
     const active = state.ants.filter(a => a.status === "working").length;
     const progress = m.tasksTotal > 0 ? m.tasksDone / m.tasksTotal : 0;

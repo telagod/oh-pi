@@ -39,7 +39,7 @@ function getCurrentVersion(): string | null {
   } catch { return null; }
 }
 
-function isNewer(latest: string, current: string): boolean {
+export function isNewer(latest: string, current: string): boolean {
   const a = latest.split(".").map(Number);
   const b = current.split(".").map(Number);
   for (let i = 0; i < 3; i++) {

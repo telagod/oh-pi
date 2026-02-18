@@ -5,7 +5,7 @@
  */
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-const DANGEROUS_PATTERNS = [
+export const DANGEROUS_PATTERNS = [
   /\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|.*-rf\b|.*--force\b)/,
   /\bsudo\s+rm\b/,
   /\b(DROP|TRUNCATE|DELETE\s+FROM)\b/i,
@@ -15,7 +15,7 @@ const DANGEROUS_PATTERNS = [
   />\s*\/dev\/sd[a-z]/,
 ];
 
-const PROTECTED_PATHS = [".env", ".git/", "node_modules/", ".pi/", "id_rsa", ".ssh/"];
+export const PROTECTED_PATHS = [".env", ".git/", "node_modules/", ".pi/", "id_rsa", ".ssh/"];
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {

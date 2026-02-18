@@ -17,7 +17,7 @@ const PROVIDER_API_URLS: Record<string, string> = {
 };
 
 /** Block internal/private IPs to prevent SSRF */
-function isUnsafeUrl(urlStr: string): boolean {
+export function isUnsafeUrl(urlStr: string): boolean {
   try {
     const u = new URL(urlStr);
     const host = u.hostname;

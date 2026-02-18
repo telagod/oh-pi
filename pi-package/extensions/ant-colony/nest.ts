@@ -24,6 +24,7 @@ export class Nest {
   private stateCache: ColonyState | null = null;
   private gcCounter: number = 0;
   private pheromoneByFile: Map<string, Pheromone[]> = new Map();
+  private pheromoneIndexDirty: boolean = true;
 
   constructor(private cwd: string, private colonyId: string) {
     this.dir = path.join(cwd, ".ant-colony", colonyId);
@@ -51,6 +52,14 @@ export class Nest {
     base.tasks = this.getAllTasks();
     base.pheromones = this.getAllPheromones();
     return base;
+  }
+
+  /** 轻量版 getState：只返回 stateCache + tasks，不触发 pheromone 读取 */
+  getStateLight(): ColonyState {
+    if (!this.stateCache) {
+      this.stateCache = this.readJson<ColonyState>(this.stateFile);
+    }
+    return { ...this.stateCache, tasks: this.getAllTasks() };
   }
 
   updateState(patch: Partial<Pick<ColonyState, "status" | "concurrency" | "metrics" | "ants" | "finishedAt">>): void {
@@ -158,43 +167,11 @@ export class Nest {
     }
   }
 
-  /** 获取下一个可领取的任务（按优先级 + 信息素强度 - repellent负信息素排序，ε-greedy 随机觅食） */
-  nextPendingTask(caste: "scout" | "worker" | "soldier"): Task | null {
-    const tasks = this.getAllTasks()
-      .filter(t => t.status === "pending" && t.caste === caste);
-    if (tasks.length === 0) return null;
-
-    // ε-greedy：10% 概率随机选任务，避免蚂蚁全挤同一条路
-    if (tasks.length > 1 && Math.random() < 0.1) {
-      return tasks[Math.floor(Math.random() * tasks.length)];
-    }
-
-    // 信息素加权：用索引查询而非全量扫描
-    this.getAllPheromones(); // 确保索引已建立
-    const scored = tasks.map(t => {
-      let pScore = 0;
-      const seen = new Set<Pheromone>();
-      for (const f of t.files) {
-        const related = this.pheromoneByFile.get(f);
-        if (!related) continue;
-        for (const p of related) {
-          if (seen.has(p) || p.strength <= 0.1) continue;
-          seen.add(p);
-          if (p.type === "discovery" || p.type === "completion") pScore += p.strength;
-          else if (p.type === "repellent") pScore -= p.strength * 3;
-          else if (p.type === "warning") pScore -= p.strength;
-        }
-      }
-      return { task: t, score: (6 - t.priority) + pScore };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    return scored[0]?.task ?? null;
-  }
-
   // ═══ Pheromones ═══
 
   dropPheromone(p: Pheromone): void {
     fs.appendFileSync(this.pheromoneFile, JSON.stringify(p) + "\n");
+    this.pheromoneIndexDirty = true;
   }
 
   getAllPheromones(): Pheromone[] {
@@ -223,15 +200,19 @@ export class Nest {
       return p.strength > 0.05;
     });
     const hadGarbage = this.pheromoneCache.length < beforeLen;
+    if (hadGarbage) this.pheromoneIndexDirty = true;
 
-    // 重建文件索引
-    this.pheromoneByFile.clear();
-    for (const p of this.pheromoneCache) {
-      for (const f of p.files) {
-        let arr = this.pheromoneByFile.get(f);
-        if (!arr) { arr = []; this.pheromoneByFile.set(f, arr); }
-        arr.push(p);
+    // 重建文件索引（仅在 dirty 时）
+    if (this.pheromoneIndexDirty) {
+      this.pheromoneByFile.clear();
+      for (const p of this.pheromoneCache) {
+        for (const f of p.files) {
+          let arr = this.pheromoneByFile.get(f);
+          if (!arr) { arr = []; this.pheromoneByFile.set(f, arr); }
+          arr.push(p);
+        }
       }
+      this.pheromoneIndexDirty = false;
     }
 
     // GC：每 10 次调用，若有弱条目被过滤则重写文件
@@ -298,7 +279,7 @@ export class Nest {
 
   private withStateLock<T>(fn: () => T): T {
     const MAX_WAIT = 3000;
-    const SPIN_MS = 1;
+    const SPIN_MS = 5;
     const start = Date.now();
     while (true) {
       try {
@@ -319,8 +300,8 @@ export class Nest {
           // 进程存活且锁未过期，放弃等待
           throw new Error(`[Nest] withStateLock timeout after ${MAX_WAIT}ms`);
         }
-        // 简单 busy-wait，避免 SharedArrayBuffer 依赖
-        const until = Date.now() + SPIN_MS + Math.random() * SPIN_MS;
+        // 简单 busy-wait + jitter，避免 SharedArrayBuffer 依赖
+        const until = Date.now() + SPIN_MS + Math.random() * SPIN_MS * 2;
         while (Date.now() < until) { /* spin */ }
       }
     }

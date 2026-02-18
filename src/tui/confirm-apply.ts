@@ -11,7 +11,7 @@ import { applyConfig, installPi, backupConfig } from "../utils/install.js";
  * @param dir - 目录名称前缀
  * @returns 匹配的文件数
  */
-function countExisting(env: EnvInfo, dir: string): number {
+export function countExisting(env: EnvInfo, dir: string): number {
   return env.existingFiles.filter(f => f.startsWith(dir + "/")).length;
 }
 
