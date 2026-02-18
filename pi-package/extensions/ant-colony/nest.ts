@@ -102,6 +102,42 @@ export class Nest {
     });
   }
 
+  /** 原子选取并 claim 下一个任务，消灭 nextPendingTask+claimTask 之间的竞态窗口 */
+  claimNextTask(caste: "scout" | "worker" | "soldier" | "drone", antId: string): Task | null {
+    return this.withStateLock(() => {
+      const tasks = this.getAllTasks().filter(t => t.status === "pending" && t.caste === caste);
+      if (tasks.length === 0) return null;
+
+      this.getAllPheromones();
+      let chosen: Task;
+      if (tasks.length > 1 && Math.random() < 0.1) {
+        chosen = tasks[Math.floor(Math.random() * tasks.length)];
+      } else {
+        const scored = tasks.map(t => {
+          let pScore = 0;
+          const seen = new Set<Pheromone>();
+          for (const f of t.files) {
+            for (const p of this.pheromoneByFile.get(f) ?? []) {
+              if (seen.has(p) || p.strength <= 0.1) continue;
+              seen.add(p);
+              if (p.type === "discovery" || p.type === "completion") pScore += p.strength;
+              else if (p.type === "repellent") pScore -= p.strength * 3;
+              else if (p.type === "warning") pScore -= p.strength;
+            }
+          }
+          return { task: t, score: (6 - t.priority) + pScore };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        chosen = scored[0].task;
+      }
+
+      chosen.status = "claimed";
+      chosen.claimedBy = antId;
+      this.writeTask(chosen);
+      return chosen;
+    });
+  }
+
   updateTaskStatus(taskId: string, status: TaskStatus, result?: string, error?: string): void {
     const task = this.getTask(taskId);
     if (!task) return;
@@ -280,7 +316,8 @@ export class Nest {
             // 进程存活检查作为第二道防线
             try { process.kill(holder, 0); } catch { fs.unlinkSync(this.lockFile); continue; }
           } catch { try { fs.unlinkSync(this.lockFile); } catch {} }
-          continue;
+          // 进程存活且锁未过期，放弃等待
+          throw new Error(`[Nest] withStateLock timeout after ${MAX_WAIT}ms`);
         }
         // 简单 busy-wait，避免 SharedArrayBuffer 依赖
         const until = Date.now() + SPIN_MS + Math.random() * SPIN_MS;

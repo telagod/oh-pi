@@ -178,9 +178,8 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       if (spent >= state.maxCost) return "budget";
     }
 
-    const task = nest.nextPendingTask(caste);
+    const task = nest.claimNextTask(caste, "queen");
     if (!task) return "empty";
-    if (!nest.claimTask(task.id, "queen")) return "empty";
 
     const ant: Ant = {
       id: "", caste, status: "idle", taskId: task.id,
@@ -192,13 +191,18 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 
     try {
       const ANT_TIMEOUT = 5 * 60 * 1000; // 5 min hard timeout per ant
+      const antAbort = new AbortController();
+      signal?.addEventListener("abort", () => antAbort.abort(), { once: true });
+      const antSignal = antAbort.signal;
       const antPromise = caste === "drone"
         ? runDrone(cwd, nest, task)
-        : spawnAnt(cwd, nest, task, config, signal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
+        : spawnAnt(cwd, nest, task, config, antSignal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
       let timeoutId: ReturnType<typeof setTimeout>;
       const result = await Promise.race([
         antPromise.finally(() => clearTimeout(timeoutId)),
-        new Promise<never>((_, reject) => { timeoutId = setTimeout(() => reject(new Error("Ant timeout (5min)")), ANT_TIMEOUT); }),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => { antAbort.abort(); reject(new Error("Ant timeout (5min)")); }, ANT_TIMEOUT);
+        }),
       ]);
       callbacks.onAntDone?.(result.ant, task, result.output);
 
@@ -645,9 +649,15 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
       }
     }
 
-    // Soldier review for resumed colony
+    // Soldier review for resumed colony（条件与 runColony 对齐）
+    let tscPassed = true;
+    try {
+      const { execSync } = await import("node:child_process");
+      execSync("npx tsc --noEmit", { cwd: opts.cwd, timeout: 30000, stdio: "pipe" });
+    } catch { tscPassed = false; }
+
     const completedWorkerTasks = nest.getAllTasks().filter(t => t.caste === "worker" && t.status === "done");
-    if (completedWorkerTasks.length > 0) {
+    if (completedWorkerTasks.length > 0 && (!tscPassed || completedWorkerTasks.length > 3)) {
       nest.updateState({ status: "reviewing" });
       const reviewTask = makeReviewTask(completedWorkerTasks);
       nest.writeTask(reviewTask);
