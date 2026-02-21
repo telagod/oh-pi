@@ -2,13 +2,14 @@
  * oh-pi Background Process Extension
  *
  * 任何 bash 命令超时未完成时，自动送到后台执行。
+ * 进程完成后自动通过 sendMessage 通知 LLM，无需轮询。
  * 提供 bg_status 工具让 LLM 查看/停止后台进程。
  */
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { spawn, execSync } from "node:child_process";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, appendFileSync, existsSync } from "node:fs";
 
 /** 超时阈值（毫秒），超过此时间自动后台化 */
 const BG_TIMEOUT_MS = 10_000;
@@ -18,6 +19,8 @@ interface BgProcess {
   command: string;
   logFile: string;
   startedAt: number;
+  finished: boolean;
+  exitCode: number | null;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -41,6 +44,7 @@ export default function (pi: ExtensionAPI) {
         let stdout = "";
         let stderr = "";
         let settled = false;
+        let backgrounded = false;
 
         const child = spawn("bash", ["-c", command], {
           cwd: process.cwd(),
@@ -48,36 +52,58 @@ export default function (pi: ExtensionAPI) {
           stdio: ["ignore", "pipe", "pipe"],
         });
 
-        child.stdout?.on("data", (d: Buffer) => { stdout += d.toString(); });
-        child.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
+        child.stdout?.on("data", (d: Buffer) => {
+          const chunk = d.toString();
+          stdout += chunk;
+          // 后台化后追加写入日志
+          if (backgrounded) {
+            try { appendFileSync(bgProcesses.get(child.pid!)?.logFile ?? "", chunk); } catch {}
+          }
+        });
+        child.stderr?.on("data", (d: Buffer) => {
+          const chunk = d.toString();
+          stderr += chunk;
+          if (backgrounded) {
+            try { appendFileSync(bgProcesses.get(child.pid!)?.logFile ?? "", chunk); } catch {}
+          }
+        });
 
-        // 超时处理：分离进程，送到后台
+        // 超时处理：保持管道，标记为后台
         const timer = setTimeout(() => {
           if (settled) return;
           settled = true;
+          backgrounded = true;
 
-          // 分离子进程，让它继续运行
-          child.stdout?.removeAllListeners();
-          child.stderr?.removeAllListeners();
-          child.removeAllListeners();
           child.unref();
 
           const logFile = `/tmp/oh-pi-bg-${Date.now()}.log`;
           const pid = child.pid!;
 
-          // 启动一个 tail 进程把后续输出写入日志
-          try {
-            const tailCmd = `(echo ${JSON.stringify(stdout + stderr)}; tail --pid=${pid} -f /proc/${pid}/fd/1 2>/dev/null) > ${logFile} 2>&1 &`;
-            spawn("bash", ["-c", tailCmd], { detached: true, stdio: "ignore" }).unref();
-          } catch {
-            // fallback: 至少把已有输出写入日志
-            writeFileSync(logFile, stdout + stderr);
-          }
+          // 把已有输出写入日志
+          writeFileSync(logFile, stdout + stderr);
 
-          bgProcesses.set(pid, { pid, command, logFile, startedAt: Date.now() });
+          const proc: BgProcess = { pid, command, logFile, startedAt: Date.now(), finished: false, exitCode: null };
+          bgProcesses.set(pid, proc);
+
+          // 监听完成事件，自动通知 LLM
+          child.on("close", (code) => {
+            proc.finished = true;
+            proc.exitCode = code;
+            const tail = (stdout + stderr).slice(-3000);
+            const truncated = (stdout + stderr).length > 3000 ? "[...truncated]\n" + tail : tail;
+            // 最终输出写入日志
+            try { writeFileSync(logFile, stdout + stderr); } catch {}
+
+            pi.sendMessage({
+              content: `[BG_PROCESS_DONE] PID ${pid} finished (exit ${code ?? "?"})\nCommand: ${command}\n\nOutput (last 3000 chars):\n${truncated}`,
+              display: true,
+              triggerTurn: true,
+              deliverAs: "followUp",
+            });
+          });
 
           const preview = (stdout + stderr).slice(0, 500);
-          const text = `Command still running after ${effectiveTimeout / 1000}s, moved to background.\nPID: ${pid}\nLog: ${logFile}\nView output: tail -f ${logFile}\nStop: kill ${pid}\n\nOutput so far:\n${preview}`;
+          const text = `Command still running after ${effectiveTimeout / 1000}s, moved to background.\nPID: ${pid}\nLog: ${logFile}\nStop: kill ${pid}\n\nOutput so far:\n${preview}\n\n⏳ You will be notified automatically when it finishes. No need to poll.`;
 
           resolve({
             content: [{ type: "text", text }],
@@ -85,7 +111,7 @@ export default function (pi: ExtensionAPI) {
           });
         }, effectiveTimeout);
 
-        // 正常结束
+        // 正常结束（超时前）
         child.on("close", (code) => {
           if (settled) return;
           settled = true;
@@ -146,8 +172,7 @@ export default function (pi: ExtensionAPI) {
           return { content: [{ type: "text", text: "No background processes." }], details: {} };
         }
         const lines = [...bgProcesses.values()].map((p) => {
-          const alive = isAlive(p.pid);
-          const status = alive ? "🟢 running" : "⚪ stopped";
+          const status = p.finished ? `⚪ stopped (exit ${p.exitCode ?? "?"})` : (isAlive(p.pid) ? "🟢 running" : "⚪ stopped");
           return `PID: ${p.pid} | ${status} | Log: ${p.logFile}\n  Cmd: ${p.command}`;
         });
         return { content: [{ type: "text", text: lines.join("\n\n") }], details: {} };
@@ -171,13 +196,7 @@ export default function (pi: ExtensionAPI) {
             return { content: [{ type: "text", text: `Error reading log: ${e.message}` }], details: {}, isError: true };
           }
         }
-        // fallback: 直接读 /proc
-        try {
-          const out = execSync(`tail -20 /proc/${pid}/fd/1 2>/dev/null || echo "(cannot read output)"`, { timeout: 3000 }).toString();
-          return { content: [{ type: "text", text: out }], details: {} };
-        } catch {
-          return { content: [{ type: "text", text: "No log available for this PID." }], details: {} };
-        }
+        return { content: [{ type: "text", text: "No log available for this PID." }], details: {} };
       }
 
       if (action === "stop") {
@@ -197,8 +216,10 @@ export default function (pi: ExtensionAPI) {
 
   // 清理：退出时杀掉所有后台进程
   pi.on("session_shutdown", async () => {
-    for (const [pid] of bgProcesses) {
-      try { process.kill(pid, "SIGTERM"); } catch {}
+    for (const [pid, proc] of bgProcesses) {
+      if (!proc.finished) {
+        try { process.kill(pid, "SIGTERM"); } catch {}
+      }
     }
     bgProcesses.clear();
   });

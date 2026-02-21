@@ -51,7 +51,6 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
   // 当前运行中的后台蚁群（同时只允许一个）
   let activeColony: BackgroundColony | null = null;
-  let uiListenersRegistered = false;
 
   // ─── Status 渲染 ───
 
@@ -63,12 +62,18 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     pi.events.emit("ant-colony:render");
   };
 
-  // 监听事件来更新 UI（确保在有 ctx 的上下文中）
-  pi.on("session_start", async (_event, ctx) => {
-    if (uiListenersRegistered) return;
-    uiListenersRegistered = true;
+  // 每次 session_start 重新绑定事件，确保 ctx 始终是最新的
+  let renderHandler: (() => void) | null = null;
+  let clearHandler: (() => void) | null = null;
+  let notifyHandler: ((data: { msg: string; level: "info" | "success" | "warning" | "error" }) => void) | null = null;
 
-    pi.events.on("ant-colony:render", () => {
+  pi.on("session_start", async (_event, ctx) => {
+    // 移除旧监听器（session 重启 / /reload 时 ctx 已失效）
+    if (renderHandler) pi.events.off("ant-colony:render", renderHandler);
+    if (clearHandler) pi.events.off("ant-colony:clear-ui", clearHandler);
+    if (notifyHandler) pi.events.off("ant-colony:notify", notifyHandler);
+
+    renderHandler = () => {
       if (!activeColony) return;
       const { state } = activeColony;
       const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
@@ -81,14 +86,17 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       parts.push(elapsed);
 
       ctx.ui.setStatus("ant-colony", parts.join(" │ "));
-    });
-
-    pi.events.on("ant-colony:clear-ui", () => {
+    };
+    clearHandler = () => {
       ctx.ui.setStatus("ant-colony", undefined);
-    });
-    pi.events.on("ant-colony:notify", (data: { msg: string; level: "info" | "success" | "warning" | "error" }) => {
+    };
+    notifyHandler = (data) => {
       ctx.ui.notify(data.msg, data.level);
-    });
+    };
+
+    pi.events.on("ant-colony:render", renderHandler);
+    pi.events.on("ant-colony:clear-ui", clearHandler);
+    pi.events.on("ant-colony:notify", notifyHandler);
   });
 
   // ─── 同步模式（print mode）：阻塞等待蚁群完成 ───
@@ -162,14 +170,14 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     const callbacks: QueenCallbacks = {
       onSignal(signal) {
         colony.phase = signal.message;
-        // 阶段切换时注入消息到主进程对话流
+        // 阶段切换时注入消息到主进程对话流（display: true 让 LLM 下次可见，无需轮询）
         if (signal.phase !== lastPhase) {
           lastPhase = signal.phase;
           const pct = Math.round(signal.progress * 100);
           pi.sendMessage({
             customType: "ant-colony-progress",
             content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] 🐜 ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
-            display: false,
+            display: true,
           }, { triggerTurn: false, deliverAs: "followUp" });
         }
         throttledRender();
@@ -194,7 +202,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         pi.sendMessage({
           customType: "ant-colony-progress",
           content: `[COLONY_SIGNAL:TASK_DONE] 🐜 ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
-          display: false,
+          display: true,
         }, { triggerTurn: false, deliverAs: "followUp" });
         throttledRender();
       },
@@ -367,11 +375,13 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         };
 
         // 定时刷新
-        const timer = setInterval(() => {
+        let timer: ReturnType<typeof setInterval> | null = setInterval(() => {
           cachedWidth = undefined;
           cachedLines = undefined;
           tui.requestRender();
         }, 1000);
+
+        const cleanup = () => { if (timer) { clearInterval(timer); timer = null; } };
 
         return {
           render(width: number): string[] {
@@ -380,10 +390,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             cachedWidth = width;
             return cachedLines;
           },
-          invalidate() { cachedWidth = undefined; cachedLines = undefined; },
+          invalidate() { cachedWidth = undefined; cachedLines = undefined; cleanup(); },
           handleInput(data: string) {
             if (matchesKey(data, "escape")) {
-              clearInterval(timer);
+              cleanup();
               done(undefined);
             }
           },

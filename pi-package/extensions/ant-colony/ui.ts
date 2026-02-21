@@ -33,7 +33,8 @@ export function buildReport(state: ColonyState): string {
   return [
     `## 🐜 Ant Colony Report`,
     `**Goal:** ${state.goal}`,
-    `**Status:** ${statusIcon(state.status)} ${state.status} │ ${elapsed} │ ${formatCost(m.totalCost)}`,
+    `**Status:** ${statusIcon(state.status)} ${state.status} │ ${formatCost(m.totalCost)}`,
+    `**Duration:** ${elapsed}`,
     `**Tasks:** ${m.tasksDone}/${m.tasksTotal} done${m.tasksFailed > 0 ? `, ${m.tasksFailed} failed` : ""}`,
     ``,
     ...state.tasks.filter(t => t.status === "done").map(t =>
