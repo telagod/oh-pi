@@ -20,8 +20,8 @@
 - [ ] 将错误与预算超限显示固定到顶部警示区（避免被任务列表淹没）。
 
 ### P2：交互体验
-- 增加详情面板分页（Tasks / Streams / Log）。
-- 支持按任务状态过滤（done/active/failed）。
+- [x] 增加详情面板分页（Tasks / Streams / Log）。
+- [x] 支持按任务状态过滤（done/active/failed/all）。
 
 ### P3：视觉一致性
 - 统一信号文本与 UI 标签命名（如 `PLANNING_RECOVERY` 的展示文案）。

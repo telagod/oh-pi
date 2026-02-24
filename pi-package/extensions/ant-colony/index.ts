@@ -395,6 +395,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       await ctx.ui.custom<void>((tui, theme, _kb, done) => {
         let cachedWidth: number | undefined;
         let cachedLines: string[] | undefined;
+        let currentTab: "tasks" | "streams" | "log" = "tasks";
+        let taskFilter: "all" | "active" | "done" | "failed" = "all";
 
         const buildLines = (width: number): string[] => {
           const c = activeColony;
@@ -422,59 +424,104 @@ export default function antColonyExtension(pi: ExtensionAPI) {
           }
           lines.push("");
 
-          // ── Tasks ──
+          // ── Tabs ──
+          const tabs: Array<{ key: "tasks" | "streams" | "log"; hotkey: string; label: string }> = [
+            { key: "tasks", hotkey: "1", label: "Tasks" },
+            { key: "streams", hotkey: "2", label: "Streams" },
+            { key: "log", hotkey: "3", label: "Log" },
+          ];
+          const tabLine = tabs.map((t) => {
+            const label = `[${t.hotkey}] ${t.label}`;
+            return currentTab === t.key ? theme.fg("accent", theme.bold(label)) : theme.fg("muted", label);
+          }).join("  ");
+          lines.push(`  ${tabLine}`);
+          lines.push("");
+
           const tasks = c.state?.tasks || [];
-          if (tasks.length > 0) {
-            lines.push(theme.fg("accent", "  Tasks"));
-            for (const t of tasks.slice(0, 15)) {
-              const icon = t.status === "done" ? theme.fg("success", "✓")
-                : t.status === "failed" ? theme.fg("error", "✗")
-                : t.status === "active" ? theme.fg("warning", "●")
-                : theme.fg("dim", "○");
-              const dur = t.finishedAt && t.startedAt ? theme.fg("dim", ` ${formatDuration(t.finishedAt - t.startedAt)}`) : "";
-              lines.push(`  ${icon} ${casteIcon(t.caste)} ${theme.fg("text", trim(t.title, w - 12))}${dur}`);
-            }
-            if (tasks.length > 15) lines.push(theme.fg("muted", `  ⋯ +${tasks.length - 15} more`));
-            lines.push("");
-          }
-
-          // ── Active Ants ──
           const streams = Array.from(c.antStreams.values());
-          if (streams.length > 0) {
+
+          // ── Tab: Tasks ──
+          if (currentTab === "tasks") {
+            const counts = {
+              done: tasks.filter(t => t.status === "done").length,
+              active: tasks.filter(t => t.status === "active").length,
+              failed: tasks.filter(t => t.status === "failed").length,
+              pending: tasks.filter(t => t.status === "pending" || t.status === "claimed" || t.status === "blocked").length,
+            };
+            lines.push(theme.fg("accent", "  Tasks"));
+            lines.push(theme.fg("muted", `  done:${counts.done} │ active:${counts.active} │ pending:${counts.pending} │ failed:${counts.failed}`));
+            lines.push(theme.fg("muted", "  Filter: [0] all  [a] active  [d] done  [f] failed"));
+            lines.push(theme.fg("dim", `  Current filter: ${taskFilter.toUpperCase()}`));
+            lines.push("");
+
+            const filtered = tasks.filter(t =>
+              taskFilter === "all" ? true :
+                taskFilter === "active" ? t.status === "active" :
+                  taskFilter === "done" ? t.status === "done" :
+                    t.status === "failed"
+            );
+
+            if (filtered.length === 0) {
+              lines.push(theme.fg("dim", "  (no tasks match current filter)"));
+            } else {
+              for (const t of filtered.slice(0, 16)) {
+                const icon = t.status === "done" ? theme.fg("success", "✓")
+                  : t.status === "failed" ? theme.fg("error", "✗")
+                  : t.status === "active" ? theme.fg("warning", "●")
+                  : theme.fg("dim", "○");
+                const dur = t.finishedAt && t.startedAt ? theme.fg("dim", ` ${formatDuration(t.finishedAt - t.startedAt)}`) : "";
+                lines.push(`  ${icon} ${casteIcon(t.caste)} ${theme.fg("text", trim(t.title, w - 12))}${dur}`);
+              }
+              if (filtered.length > 16) lines.push(theme.fg("muted", `  ⋯ +${filtered.length - 16} more`));
+            }
+            lines.push("");
+          }
+
+          // ── Tab: Streams ──
+          if (currentTab === "streams") {
             lines.push(theme.fg("accent", `  Active Ant Streams (${streams.length})`));
-            for (const s of streams.slice(0, 6)) {
-              const excerpt = trim((s.lastLine || "...").replace(/\s+/g, " "), Math.max(20, w - 24));
-              lines.push(`  ${casteIcon(s.caste)} ${theme.fg("dim", s.antId.slice(0, 12))} ${theme.fg("muted", `${formatTokens(s.tokens)}t`)} ${theme.fg("text", excerpt)}`);
+            lines.push(theme.fg("muted", "  Shows latest line + token count for active ants"));
+            lines.push("");
+            if (streams.length === 0) {
+              lines.push(theme.fg("dim", "  (no active streams right now)"));
+            } else {
+              for (const s of streams.slice(0, 10)) {
+                const excerpt = trim((s.lastLine || "...").replace(/\s+/g, " "), Math.max(20, w - 24));
+                lines.push(`  ${casteIcon(s.caste)} ${theme.fg("dim", s.antId.slice(0, 12))} ${theme.fg("muted", `${formatTokens(s.tokens)}t`)} ${theme.fg("text", excerpt)}`);
+              }
+              if (streams.length > 10) lines.push(theme.fg("muted", `  ⋯ +${streams.length - 10} more streams`));
             }
-            if (streams.length > 6) lines.push(theme.fg("muted", `  ⋯ +${streams.length - 6} more streams`));
             lines.push("");
           }
 
-          // ── Warnings ──
-          const failedTasks = tasks.filter(t => t.status === "failed");
-          if (failedTasks.length > 0) {
-            lines.push(theme.fg("warning", `  Warnings (${failedTasks.length})`));
-            for (const t of failedTasks.slice(0, 4)) {
-              lines.push(`  ${theme.fg("error", "✗")} ${theme.fg("text", trim(t.title, w - 8))}`);
+          // ── Tab: Log ──
+          if (currentTab === "log") {
+            const failedTasks = tasks.filter(t => t.status === "failed");
+            if (failedTasks.length > 0) {
+              lines.push(theme.fg("warning", `  Warnings (${failedTasks.length})`));
+              for (const t of failedTasks.slice(0, 4)) {
+                lines.push(`  ${theme.fg("error", "✗")} ${theme.fg("text", trim(t.title, w - 8))}`);
+              }
+              if (failedTasks.length > 4) lines.push(theme.fg("muted", `  ⋯ +${failedTasks.length - 4} more failed tasks`));
+              lines.push("");
             }
-            if (failedTasks.length > 4) lines.push(theme.fg("muted", `  ⋯ +${failedTasks.length - 4} more failed tasks`));
-            lines.push("");
-          }
 
-          // ── Recent Signals ──
-          const recentLogs = c.logs.slice(-6);
-          if (recentLogs.length > 0) {
+            const recentLogs = c.logs.slice(-12);
             lines.push(theme.fg("accent", "  Recent Signals"));
-            const now = Date.now();
-            for (const log of recentLogs) {
-              const age = formatDuration(Math.max(0, now - log.timestamp));
-              const levelIcon = log.level === "error" ? theme.fg("error", "✗") : log.level === "warning" ? theme.fg("warning", "!") : theme.fg("muted", "•");
-              lines.push(`  ${levelIcon} ${theme.fg("dim", age)} ${theme.fg("text", trim(log.text, w - 12))}`);
+            if (recentLogs.length === 0) {
+              lines.push(theme.fg("dim", "  (no signal logs yet)"));
+            } else {
+              const now = Date.now();
+              for (const log of recentLogs) {
+                const age = formatDuration(Math.max(0, now - log.timestamp));
+                const levelIcon = log.level === "error" ? theme.fg("error", "✗") : log.level === "warning" ? theme.fg("warning", "!") : theme.fg("muted", "•");
+                lines.push(`  ${levelIcon} ${theme.fg("dim", age)} ${theme.fg("text", trim(log.text, w - 12))}`);
+              }
             }
             lines.push("");
           }
 
-          lines.push(theme.fg("muted", "  esc close"));
+          lines.push(theme.fg("muted", "  [1/2/3] switch tabs │ [0/a/d/f] task filter │ esc close"));
           return lines;
         };
 
@@ -499,7 +546,21 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             if (matchesKey(data, "escape")) {
               cleanup();
               done(undefined);
+              return;
             }
+
+            if (data === "1") currentTab = "tasks";
+            else if (data === "2") currentTab = "streams";
+            else if (data === "3") currentTab = "log";
+            else if (data === "0") taskFilter = "all";
+            else if (data.toLowerCase() === "a") taskFilter = "active";
+            else if (data.toLowerCase() === "d") taskFilter = "done";
+            else if (data.toLowerCase() === "f") taskFilter = "failed";
+            else return;
+
+            cachedWidth = undefined;
+            cachedLines = undefined;
+            tui.requestRender();
           },
         };
       }, { overlay: true, overlayOptions: { anchor: "center", width: "80%", maxHeight: "80%" } });
