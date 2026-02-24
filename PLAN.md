@@ -67,7 +67,7 @@
 ## Phase C（Week 5-6）：pi SDK 反腐层（解决 spawner 耦合）
 
 ### 交付物
-- [ ] 新增 `PiAdapter`（anti-corruption layer）
+- [ ] 新增 `PiAdapter`（anti-corruption layer，接口草案见 `docs/PI-ADAPTER.md`）
   - Session 创建
   - Tool 注入
   - 流式回调
@@ -111,8 +111,9 @@
 
 - [x] 补齐 `README.fr.md` 首屏与中英一致（定位统一）
 - [ ] 产出 2 分钟 asciinema（含字幕版）
-- [ ] 建立 `benchmarks/` 目录与任务模板（先空框架）
+- [x] 建立 `benchmarks/` 目录与任务模板（先空框架，见 `benchmarks/`）
 - [x] 起草 `PheromoneStore` 接口草案（见 `docs/PHEROMONE-STORE.md`）
+- [x] 起草 `PiAdapter` 接口草案（见 `docs/PI-ADAPTER.md`）
 
 ---
 
