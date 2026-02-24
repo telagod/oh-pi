@@ -17,10 +17,40 @@ export function formatTokens(n: number): string {
 
 export function statusIcon(status: string): string {
   const icons: Record<string, string> = {
-    scouting: "🔍", planning_recovery: "♻️", working: "⚒️", reviewing: "🛡️",
-    done: "✅", failed: "❌", budget_exceeded: "💰",
+    launched: "🚀",
+    scouting: "🔍",
+    planning_recovery: "♻️",
+    working: "⚒️",
+    reviewing: "🛡️",
+    task_done: "✅",
+    done: "✅",
+    complete: "✅",
+    failed: "❌",
+    budget_exceeded: "💰",
   };
   return icons[status] || "🐜";
+}
+
+export function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    launched: "LAUNCHED",
+    scouting: "SCOUTING",
+    planning_recovery: "PLANNING_RECOVERY",
+    working: "WORKING",
+    reviewing: "REVIEWING",
+    task_done: "TASK_DONE",
+    done: "DONE",
+    complete: "COMPLETE",
+    failed: "FAILED",
+    budget_exceeded: "BUDGET_EXCEEDED",
+  };
+  return labels[status] || status.toUpperCase();
+}
+
+export function progressBar(progress: number, width = 14): string {
+  const p = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  const filled = Math.round(width * p);
+  return `[${"#".repeat(filled)}${"-".repeat(Math.max(0, width - filled))}]`;
 }
 
 export function casteIcon(caste: string): string {

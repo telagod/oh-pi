@@ -22,20 +22,28 @@ npx oh-pi
 
 ---
 
-## Pourquoi
-
-pi-coding-agent est puissant dès l'installation. Mais configurer manuellement les fournisseurs, thèmes, extensions, compétences et modèles de prompts est fastidieux. oh-pi offre une TUI moderne qui fait tout en moins d'une minute — et embarque un **essaim de fourmis** qui transforme pi en système multi-agents.
-
-## Démarrage rapide
+## Démarrage en 30 secondes
 
 ```bash
 npx oh-pi    # tout configurer
 pi           # commencer à coder
 ```
 
-C'est tout. oh-pi détecte votre environnement, vous guide dans la configuration et écrit `~/.pi/agent/` pour vous.
+oh-pi détecte automatiquement votre environnement, vous guide dans une TUI moderne, puis écrit `~/.pi/agent/`.
 
-Vous avez déjà une config ? oh-pi la détecte et propose une **sauvegarde avant écrasement**.
+Déjà configuré ? oh-pi détecte les fichiers existants et propose une **sauvegarde avant écrasement**.
+
+## Valeur en 2 minutes
+
+pi-coding-agent est puissant par défaut, mais la configuration manuelle (fournisseurs, thèmes, extensions, skills, prompts) prend du temps. oh-pi compresse cette phase en moins d'une minute — puis ajoute la colonie pour les tâches complexes.
+
+- [`docs/DEMO-SCRIPT.md`](./docs/DEMO-SCRIPT.md) — démo rapide en 2 minutes
+- [`ROADMAP.md`](./ROADMAP.md) — positionnement, jalons, métriques
+- [`DECISIONS.md`](./DECISIONS.md) — décisions produit et compromis techniques
+
+## Quand ne pas utiliser la colonie
+
+Utilisez le flux pi classique (sans colonie) si la tâche est petite, très exploratoire, ou nécessite un pilotage humain continu.
 
 ## Ce que vous obtenez
 
@@ -139,14 +147,19 @@ Utilisez `/colony-stop` pour arrêter une colonie en cours.
 
 ### Protocole de signaux
 
-La colonie communique avec la conversation principale via des signaux structurés, empêchant le LLM de vérifier ou deviner l'état :
+La colonie communique via des signaux structurés, pour éviter toute supposition côté modèle :
 
 | Signal | Signification |
 |--------|---------------|
-| `COLONY_SIGNAL:LAUNCHED` | Colonie démarrée — ne pas vérifier |
-| `COLONY_SIGNAL:RUNNING` | Colonie active — injecté à chaque tour |
-| `COLONY_SIGNAL:COMPLETE` | Colonie terminée — consulter le rapport |
-| `COLONY_SIGNAL:FAILED` | Colonie crashée — signaler l'erreur |
+| `COLONY_SIGNAL:LAUNCHED` | Colonie démarrée en arrière-plan |
+| `COLONY_SIGNAL:SCOUTING` | Vague d'éclaireuses en exploration/planification |
+| `COLONY_SIGNAL:PLANNING_RECOVERY` | Boucle de récupération du plan en cours |
+| `COLONY_SIGNAL:WORKING` | Exécution des tâches par les ouvrières |
+| `COLONY_SIGNAL:REVIEWING` | Revue qualité par les soldats |
+| `COLONY_SIGNAL:TASK_DONE` | Tâche terminée (jalon de progression) |
+| `COLONY_SIGNAL:COMPLETE` | Mission terminée, rapport injecté |
+| `COLONY_SIGNAL:FAILED` | Mission échouée avec diagnostic |
+| `COLONY_SIGNAL:BUDGET_EXCEEDED` | Budget maximal atteint |
 
 ### Contrôle des tours
 

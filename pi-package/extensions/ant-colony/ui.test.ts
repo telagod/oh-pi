@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDuration, formatCost, formatTokens, statusIcon, casteIcon, buildReport } from "./ui.js";
+import { formatDuration, formatCost, formatTokens, statusIcon, statusLabel, progressBar, casteIcon, buildReport } from "./ui.js";
 import type { ColonyState } from "./types.js";
 
 describe("formatDuration", () => {
@@ -25,14 +25,31 @@ describe("formatTokens", () => {
 });
 
 describe("statusIcon", () => {
+  it("launched", () => expect(statusIcon("launched")).toBe("🚀"));
   it("scouting", () => expect(statusIcon("scouting")).toBe("🔍"));
   it("working", () => expect(statusIcon("working")).toBe("⚒️"));
   it("planning_recovery", () => expect(statusIcon("planning_recovery")).toBe("♻️"));
   it("reviewing", () => expect(statusIcon("reviewing")).toBe("🛡️"));
+  it("task_done", () => expect(statusIcon("task_done")).toBe("✅"));
   it("done", () => expect(statusIcon("done")).toBe("✅"));
   it("failed", () => expect(statusIcon("failed")).toBe("❌"));
   it("budget_exceeded", () => expect(statusIcon("budget_exceeded")).toBe("💰"));
   it("unknown", () => expect(statusIcon("xyz")).toBe("🐜"));
+});
+
+describe("statusLabel", () => {
+  it("launched", () => expect(statusLabel("launched")).toBe("LAUNCHED"));
+  it("scouting", () => expect(statusLabel("scouting")).toBe("SCOUTING"));
+  it("planning_recovery", () => expect(statusLabel("planning_recovery")).toBe("PLANNING_RECOVERY"));
+  it("task_done", () => expect(statusLabel("task_done")).toBe("TASK_DONE"));
+  it("budget_exceeded", () => expect(statusLabel("budget_exceeded")).toBe("BUDGET_EXCEEDED"));
+  it("unknown", () => expect(statusLabel("custom")).toBe("CUSTOM"));
+});
+
+describe("progressBar", () => {
+  it("0%", () => expect(progressBar(0, 10)).toBe("[----------]"));
+  it("50%", () => expect(progressBar(0.5, 10)).toBe("[#####-----]"));
+  it("100%", () => expect(progressBar(1, 10)).toBe("[##########]"));
 });
 
 describe("casteIcon", () => {
