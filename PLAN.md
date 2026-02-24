@@ -27,9 +27,10 @@
 ## Phase A（Week 1-2）：定位与体验入口
 
 ### 交付物
-- [ ] README 首屏统一为三段：30 秒上手 / 2 分钟价值 / 不适用场景（中英法）
+- [x] README 首屏统一为三段：30 秒上手 / 2 分钟价值 / 不适用场景（中英法）
 - [ ] 发布 2 分钟演示（asciinema + GIF + 文本脚本）
 - [ ] 在 README 增加「oh-pi vs ant-colony」边界图
+- [x] 蚁群 UI 快速可读性优化（状态栏/详情面板），见 `docs/COLONY-UI-PLAN.md`
 
 ### DoD
 - 新用户 3 分钟内可完成：安装 → 配置 → 首次有效运行
@@ -114,6 +115,7 @@
 - [x] 建立 `benchmarks/` 目录与任务模板（先空框架，见 `benchmarks/`）
 - [x] 起草 `PheromoneStore` 接口草案（见 `docs/PHEROMONE-STORE.md`）
 - [x] 起草 `PiAdapter` 接口草案（见 `docs/PI-ADAPTER.md`）
+- [x] 起草并落地蚁群可视化优化计划（见 `docs/COLONY-UI-PLAN.md`）
 
 ---
 

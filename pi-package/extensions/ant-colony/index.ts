@@ -18,7 +18,7 @@ import { runColony, resumeColony, type QueenCallbacks } from "./queen.js";
 import { Nest } from "./nest.js";
 import type { ColonyState, ColonyMetrics, AntStreamEvent } from "./types.js";
 
-import { formatDuration, formatCost, formatTokens, statusIcon, casteIcon, buildReport } from "./ui.js";
+import { formatDuration, formatCost, formatTokens, statusIcon, statusLabel, progressBar, casteIcon, buildReport } from "./ui.js";
 
 // ═══ Background colony state ═══
 
@@ -52,6 +52,13 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   // 当前运行中的后台蚁群（同时只允许一个）
   let activeColony: BackgroundColony | null = null;
 
+  const calcProgress = (m?: ColonyMetrics | null) => {
+    if (!m || m.tasksTotal <= 0) return 0;
+    return Math.max(0, Math.min(1, m.tasksDone / m.tasksTotal));
+  };
+
+  const trim = (text: string, max: number) => text.length > max ? `${text.slice(0, Math.max(0, max - 1))}…` : text;
+
   // ─── Status 渲染 ───
 
   let lastRender = 0;
@@ -78,10 +85,14 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       const { state } = activeColony;
       const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
       const m = state?.metrics;
-      const colonyStatus = state?.status || "scouting";
+      const phase = state?.status || "scouting";
+      const progress = calcProgress(m);
+      const pct = `${Math.round(progress * 100)}%`;
+      const active = activeColony.antStreams.size;
 
-      const parts = [`🐜 ${statusIcon(colonyStatus)}`];
-      if (m) parts.push(`${m.tasksDone}/${m.tasksTotal}`);
+      const parts = [`🐜 ${statusIcon(phase)} ${statusLabel(phase)}`];
+      parts.push(m ? `${m.tasksDone}/${m.tasksTotal} (${pct})` : `0/0 (${pct})`);
+      parts.push(`⚡${active}`);
       if (m) parts.push(formatCost(m.totalCost));
       parts.push(elapsed);
 
@@ -341,9 +352,21 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
           // ── Header ──
           const elapsed = c.state ? formatDuration(Date.now() - c.state.createdAt) : "0s";
-          const cost = c.state ? formatCost(c.state.metrics.totalCost) : "$0";
+          const m = c.state?.metrics;
+          const phase = c.state?.status || "scouting";
+          const progress = calcProgress(m);
+          const pct = Math.round(progress * 100);
+          const cost = m ? formatCost(m.totalCost) : "$0";
+          const activeAnts = c.antStreams.size;
+          const barWidth = Math.max(10, Math.min(24, w - 28));
+
           lines.push(theme.fg("accent", theme.bold(`  🐜 Colony Details`)) + theme.fg("muted", ` │ ${elapsed} │ ${cost}`));
-          lines.push(theme.fg("dim", `  Goal: ${c.goal.slice(0, w - 8)}`));
+          lines.push(theme.fg("dim", `  Goal: ${trim(c.goal, w - 8)}`));
+          lines.push(`  ${statusIcon(phase)} ${theme.bold(statusLabel(phase))} │ ${m ? `${m.tasksDone}/${m.tasksTotal}` : "0/0"} │ ${pct}% │ ⚡${activeAnts}`);
+          lines.push(theme.fg("dim", `  ${progressBar(progress, barWidth)} ${pct}%`));
+          if (c.phase && c.phase !== "initializing") {
+            lines.push(theme.fg("muted", `  Phase: ${trim(c.phase, w - 10)}`));
+          }
           lines.push("");
 
           // ── Tasks ──
@@ -356,7 +379,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
                 : t.status === "active" ? theme.fg("warning", "●")
                 : theme.fg("dim", "○");
               const dur = t.finishedAt && t.startedAt ? theme.fg("dim", ` ${formatDuration(t.finishedAt - t.startedAt)}`) : "";
-              lines.push(`  ${icon} ${casteIcon(t.caste)} ${theme.fg("text", t.title.slice(0, w - 12))}${dur}`);
+              lines.push(`  ${icon} ${casteIcon(t.caste)} ${theme.fg("text", trim(t.title, w - 12))}${dur}`);
             }
             if (tasks.length > 15) lines.push(theme.fg("muted", `  ⋯ +${tasks.length - 15} more`));
             lines.push("");
@@ -365,7 +388,12 @@ export default function antColonyExtension(pi: ExtensionAPI) {
           // ── Active Ants ──
           const streams = Array.from(c.antStreams.values());
           if (streams.length > 0) {
-            lines.push(theme.fg("accent", `  Active: ${streams.length} ants working`));
+            lines.push(theme.fg("accent", `  Active Ant Streams (${streams.length})`));
+            for (const s of streams.slice(0, 6)) {
+              const excerpt = trim((s.lastLine || "...").replace(/\s+/g, " "), Math.max(20, w - 24));
+              lines.push(`  ${casteIcon(s.caste)} ${theme.fg("dim", s.antId.slice(0, 12))} ${theme.fg("muted", `${formatTokens(s.tokens)}t`)} ${theme.fg("text", excerpt)}`);
+            }
+            if (streams.length > 6) lines.push(theme.fg("muted", `  ⋯ +${streams.length - 6} more streams`));
             lines.push("");
           }
 
@@ -502,12 +530,17 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
     const m = state?.metrics;
     const phase = state?.status || "scouting";
+    const progress = calcProgress(m);
+    const pct = Math.round(progress * 100);
+    const activeAnts = c.antStreams.size;
 
     const lines: string[] = [
-      `🐜 ${statusIcon(phase)} ${c.goal.slice(0, 80)}`,
-      `${phase} │ ${m ? `${m.tasksDone}/${m.tasksTotal} tasks` : "starting"} │ ${m ? formatCost(m.totalCost) : "$0"} │ ${elapsed}`,
+      `🐜 ${statusIcon(phase)} ${trim(c.goal, 80)}`,
+      `${statusLabel(phase)} │ ${m ? `${m.tasksDone}/${m.tasksTotal} tasks` : "starting"} │ ${pct}% │ ⚡${activeAnts} │ ${m ? formatCost(m.totalCost) : "$0"} │ ${elapsed}`,
+      `${progressBar(progress, 18)} ${pct}%`,
     ];
 
+    if (c.phase && c.phase !== "initializing") lines.push(`Phase: ${trim(c.phase, 100)}`);
     if (m && m.tasksFailed > 0) lines.push(`⚠ ${m.tasksFailed} failed`);
 
     return lines.join("\n");

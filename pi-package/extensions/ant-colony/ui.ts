@@ -23,6 +23,25 @@ export function statusIcon(status: string): string {
   return icons[status] || "🐜";
 }
 
+export function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    scouting: "SCOUTING",
+    planning_recovery: "PLAN_RECOVERY",
+    working: "WORKING",
+    reviewing: "REVIEWING",
+    done: "DONE",
+    failed: "FAILED",
+    budget_exceeded: "BUDGET",
+  };
+  return labels[status] || status.toUpperCase();
+}
+
+export function progressBar(progress: number, width = 14): string {
+  const p = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
+  const filled = Math.round(width * p);
+  return `[${"#".repeat(filled)}${"-".repeat(Math.max(0, width - filled))}]`;
+}
+
 export function casteIcon(caste: string): string {
   return caste === "scout" ? "🔍" : caste === "soldier" ? "🛡️" : caste === "drone" ? "⚙️" : "⚒️";
 }

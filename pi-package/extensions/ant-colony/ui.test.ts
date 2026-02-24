@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDuration, formatCost, formatTokens, statusIcon, casteIcon, buildReport } from "./ui.js";
+import { formatDuration, formatCost, formatTokens, statusIcon, statusLabel, progressBar, casteIcon, buildReport } from "./ui.js";
 import type { ColonyState } from "./types.js";
 
 describe("formatDuration", () => {
@@ -33,6 +33,18 @@ describe("statusIcon", () => {
   it("failed", () => expect(statusIcon("failed")).toBe("❌"));
   it("budget_exceeded", () => expect(statusIcon("budget_exceeded")).toBe("💰"));
   it("unknown", () => expect(statusIcon("xyz")).toBe("🐜"));
+});
+
+describe("statusLabel", () => {
+  it("scouting", () => expect(statusLabel("scouting")).toBe("SCOUTING"));
+  it("planning_recovery", () => expect(statusLabel("planning_recovery")).toBe("PLAN_RECOVERY"));
+  it("unknown", () => expect(statusLabel("custom")).toBe("CUSTOM"));
+});
+
+describe("progressBar", () => {
+  it("0%", () => expect(progressBar(0, 10)).toBe("[----------]"));
+  it("50%", () => expect(progressBar(0.5, 10)).toBe("[#####-----]"));
+  it("100%", () => expect(progressBar(1, 10)).toBe("[##########]"));
 });
 
 describe("casteIcon", () => {
