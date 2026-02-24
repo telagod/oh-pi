@@ -37,6 +37,13 @@ pi           # 开始编码
 
 已有配置？oh-pi 会检测到并提供**覆盖前备份**。
 
+## 从这里开始（定位与增长）
+
+如果你正在评估项目方向，先看这两份：
+
+- [`ROADMAP.md`](./ROADMAP.md) — 产品定位拆分、里程碑与衡量指标
+- [`docs/DEMO-SCRIPT.zh.md`](./docs/DEMO-SCRIPT.zh.md) — 2 分钟演示脚本（首个 aha moment）
+
 ## 你会得到
 
 ```

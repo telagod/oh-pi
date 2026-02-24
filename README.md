@@ -37,6 +37,13 @@ That's it. oh-pi detects your environment, walks you through setup, and writes `
 
 Already have a config? oh-pi detects it and offers **backup before overwriting**.
 
+## Start Here (Positioning & Growth)
+
+If you're evaluating direction, start with:
+
+- [`ROADMAP.md`](./ROADMAP.md) — product positioning split, milestones, and success metrics
+- [`docs/DEMO-SCRIPT.zh.md`](./docs/DEMO-SCRIPT.zh.md) — 2-minute demo script for the first “aha moment”
+
 ## What You Get
 
 ```
