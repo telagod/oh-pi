@@ -136,6 +136,88 @@ export function quorumMergeTasks(nest: Nest): void {
   }
 }
 
+export interface PlanValidation {
+  ok: boolean;
+  issues: string[];
+  warnings: string[];
+}
+
+export function shouldUseScoutQuorum(goal: string): boolean {
+  // 多步骤/复合目标更适合至少 2 个 Scout 投票
+  return /(\n\s*\d+[\.)]|[;；]| and |以及|并且|同时|步骤|phase|then|之后)/i.test(goal);
+}
+
+export function validateExecutionPlan(tasks: Task[]): PlanValidation {
+  const issues: string[] = [];
+  const warnings: string[] = [];
+
+  if (tasks.length === 0) {
+    issues.push("no_pending_worker_tasks");
+    return { ok: false, issues, warnings };
+  }
+
+  for (const t of tasks) {
+    if (!t.title?.trim()) issues.push(`task:${t.id}:missing_title`);
+    if (!t.description?.trim()) issues.push(`task:${t.id}:missing_description`);
+    if (t.caste !== "worker" && t.caste !== "drone") issues.push(`task:${t.id}:invalid_caste:${t.caste}`);
+    if (t.priority < 1 || t.priority > 5) issues.push(`task:${t.id}:invalid_priority:${t.priority}`);
+    if (t.files.length === 0) warnings.push(`task:${t.id}:broad_scope`);
+  }
+
+  return { ok: issues.length === 0, issues, warnings };
+}
+
+function collectScoutIntelligence(nest: Nest, maxChars = 6000): string {
+  const scoutResults = nest.getAllTasks()
+    .filter(t => t.caste === "scout" && t.status === "done" && t.result)
+    .map(t => `## ${t.title}\n${t.result}`)
+    .join("\n\n");
+  return scoutResults.slice(0, maxChars);
+}
+
+function makeRecoveryScoutTask(goal: string, attempt: number, planIssues: string[], intel: string): Task {
+  const issueText = planIssues.length > 0 ? planIssues.map(i => `- ${i}`).join("\n") : "- no parseable worker/drone tasks generated";
+  return {
+    id: makeTaskId(),
+    parentId: null,
+    title: `Scout recovery ${attempt}: structure executable plan`,
+    description: [
+      "Previous scout output could not pass plan validation.",
+      "Transform existing intelligence into a VALID structured execution plan.",
+      "",
+      "Goal:",
+      goal,
+      "",
+      "Validation issues:",
+      issueText,
+      "",
+      "Intelligence from prior scouts:",
+      intel || "(none)",
+      "",
+      "Output requirements (STRICT):",
+      "- Return at least ONE task block",
+      "### TASK: <title>",
+      "- description: <what to do>",
+      "- files: <comma-separated file paths>",
+      "- caste: worker",
+      "- priority: <1-5>",
+      "",
+      "Do NOT execute changes. Only planning.",
+    ].join("\n"),
+    caste: "scout",
+    status: "pending",
+    priority: 1,
+    files: [],
+    claimedBy: null,
+    result: null,
+    error: null,
+    spawnedTasks: [],
+    createdAt: Date.now(),
+    startedAt: null,
+    finishedAt: null,
+  };
+}
+
 function makeReviewTask(completedTasks: Task[]): Task {
   const files = [...new Set(completedTasks.flatMap(t => t.files))];
   return {
@@ -530,7 +612,8 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 
   try {
     // ═══ Phase 1: 侦察（Bio 5: 蚁群投票 — 复杂目标派多 Scout） ═══
-    const scoutCount = opts.goal.length > 500 ? 3 : opts.goal.length > 200 ? 2 : 1;
+    const scoutCountBase = opts.goal.length > 500 ? 3 : opts.goal.length > 200 ? 2 : 1;
+    const scoutCount = shouldUseScoutQuorum(opts.goal) ? Math.max(2, scoutCountBase) : scoutCountBase;
     if (scoutCount > 1) {
       // 多 Scout 并行：为每只 Scout 创建独立任务
       for (let i = 1; i < scoutCount; i++) {
@@ -561,43 +644,36 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     // Bio 5: 合并多 Scout 产生的重复任务
     if (scoutCount > 1) quorumMergeTasks(nest);
 
-    let workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
+    const getPendingExecutionTasks = () => nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
 
-    // 只在完全没有 worker 任务时才重试一次
-    if (workerTasks.length === 0) {
-      const pheromones = nest.getAllPheromones();
-      const hasDiscoveries = pheromones.some(p => p.type === "discovery");
-      const relayTask: Task = {
-        id: makeTaskId(),
-        parentId: null,
-        title: "Scout relay: generate worker tasks",
-        description: hasDiscoveries
-          ? `Previous scout found information but didn't generate worker tasks. Generate concrete worker tasks based on discoveries.\n\nGoal:\n${opts.goal}`
-          : `Explore the codebase for this goal and generate worker tasks:\n\n${opts.goal}`,
-        caste: "scout",
-        status: "pending",
-        priority: 1,
-        files: [],
-        claimedBy: null,
-        result: null,
-        error: null,
-        spawnedTasks: [],
-        createdAt: Date.now(),
-        startedAt: null,
-        finishedAt: null,
-      };
-      nest.writeTask(relayTask);
-      callbacks.onPhase?.("scouting", "Scout relay: generating worker tasks...");
-      emitSignal("scouting", "Retrying scout...");
+    let workerTasks = getPendingExecutionTasks();
+    let plan = validateExecutionPlan(workerTasks);
+
+    // 计划恢复回路：Scout 输出不可执行时，不直接造 Worker，先让 Scout 结构化重组
+    const MAX_PLAN_RECOVERY_ROUNDS = 2;
+    let recoveryRound = 0;
+    while (!plan.ok && recoveryRound < MAX_PLAN_RECOVERY_ROUNDS) {
+      recoveryRound++;
+      nest.updateState({ status: "planning_recovery" });
+
+      const intel = collectScoutIntelligence(nest);
+      const recoveryTask = makeRecoveryScoutTask(opts.goal, recoveryRound, plan.issues, intel);
+      nest.writeTask(recoveryTask);
+
+      callbacks.onPhase?.("planning_recovery", `Plan recovery ${recoveryRound}/${MAX_PLAN_RECOVERY_ROUNDS}: restructuring scout intelligence...`);
+      emitSignal("planning_recovery", `Recovering plan (${recoveryRound}/${MAX_PLAN_RECOVERY_ROUNDS})`);
       await runAntWave({ ...waveBase, caste: "scout" });
-      workerTasks = nest.getAllTasks().filter(t => (t.caste === "worker" || t.caste === "drone") && t.status === "pending");
+      quorumMergeTasks(nest);
+
+      workerTasks = getPendingExecutionTasks();
+      plan = validateExecutionPlan(workerTasks);
     }
 
-    if (workerTasks.length === 0) {
+    if (!plan.ok) {
       nest.updateState({ status: "failed", finishedAt: Date.now() });
       const finalState = nest.getState();
       callbacks.onComplete?.(finalState);
-      emitSignal("failed", "No tasks generated");
+      emitSignal("failed", `No valid execution plan: ${plan.issues.slice(0, 3).join(", ")}`);
       return finalState;
     }
 

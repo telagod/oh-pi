@@ -27,6 +27,7 @@ describe("formatTokens", () => {
 describe("statusIcon", () => {
   it("scouting", () => expect(statusIcon("scouting")).toBe("🔍"));
   it("working", () => expect(statusIcon("working")).toBe("⚒️"));
+  it("planning_recovery", () => expect(statusIcon("planning_recovery")).toBe("♻️"));
   it("reviewing", () => expect(statusIcon("reviewing")).toBe("🛡️"));
   it("done", () => expect(statusIcon("done")).toBe("✅"));
   it("failed", () => expect(statusIcon("failed")).toBe("❌"));

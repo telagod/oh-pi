@@ -13,7 +13,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 vi.mock("@mariozechner/pi-ai", () => ({ getModel: vi.fn() }));
 
-import { classifyError, quorumMergeTasks } from "./queen.js";
+import { classifyError, quorumMergeTasks, shouldUseScoutQuorum, validateExecutionPlan } from "./queen.js";
 import { Nest } from "./nest.js";
 import type { ColonyState, Task } from "./types.js";
 
@@ -66,6 +66,40 @@ describe("classifyError", () => {
 
   it("handles empty string", () => {
     expect(classifyError("")).toBe("unknown");
+  });
+});
+
+describe("shouldUseScoutQuorum", () => {
+  it("returns true for multi-step goals", () => {
+    expect(shouldUseScoutQuorum("1) scan repo; 2) write report; 3) review output")).toBe(true);
+  });
+
+  it("returns false for simple single-step goals", () => {
+    expect(shouldUseScoutQuorum("List top-level files")).toBe(false);
+  });
+});
+
+describe("validateExecutionPlan", () => {
+  it("accepts well-formed worker tasks", () => {
+    const plan = validateExecutionPlan([
+      mkTask({ id: "t-plan-1", caste: "worker", title: "Do x", description: "desc", priority: 1, files: ["a.ts"] }),
+    ]);
+    expect(plan.ok).toBe(true);
+    expect(plan.issues).toEqual([]);
+  });
+
+  it("rejects empty plans", () => {
+    const plan = validateExecutionPlan([]);
+    expect(plan.ok).toBe(false);
+    expect(plan.issues).toContain("no_pending_worker_tasks");
+  });
+
+  it("flags non-worker cates as invalid for execution phase", () => {
+    const plan = validateExecutionPlan([
+      mkTask({ id: "t-plan-2", caste: "scout" as any }),
+    ]);
+    expect(plan.ok).toBe(false);
+    expect(plan.issues.some(i => i.includes("invalid_caste"))).toBe(true);
   });
 });
 

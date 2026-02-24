@@ -81,6 +81,39 @@ describe("parseSubTasks", () => {
     const tasks = parseSubTasks(output);
     expect(tasks[0].context).toBeTruthy();
   });
+
+  it("parses chinese task format with full-width colon", () => {
+    const output = `### 任务：生成重启检查报告
+- 描述：创建重启检查文档
+- 文件：docs/ant-colony-restart-check.md
+- 角色：worker
+- 优先级：1`;
+    const tasks = parseSubTasks(output);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].title).toContain("重启检查报告");
+    expect(tasks[0].files).toEqual(["docs/ant-colony-restart-check.md"]);
+    expect(tasks[0].caste).toBe("worker");
+    expect(tasks[0].priority).toBe(1);
+  });
+
+  it("does not infer tasks from plain next-step narrative", () => {
+    const output = `目前发现如下\n\n下一步我会继续定位：
+- 写入 docs/ant-colony-restart-check.md
+- 校验 src/index.ts 的入口流程`;
+    const tasks = parseSubTasks(output);
+    expect(tasks).toEqual([]);
+  });
+
+  it("parses bold markdown field keys", () => {
+    const output = `### TASK: Harden parser
+- **description**: support bold fields
+- **files**: pi-package/extensions/ant-colony/parser.ts
+- **caste**: worker
+- **priority**: 2`;
+    const tasks = parseSubTasks(output);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].files).toEqual(["pi-package/extensions/ant-colony/parser.ts"]);
+  });
 });
 
 describe("extractPheromones", () => {

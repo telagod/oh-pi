@@ -17,7 +17,7 @@ export function formatTokens(n: number): string {
 
 export function statusIcon(status: string): string {
   const icons: Record<string, string> = {
-    scouting: "🔍", working: "⚒️", reviewing: "🛡️",
+    scouting: "🔍", planning_recovery: "♻️", working: "⚒️", reviewing: "🛡️",
     done: "✅", failed: "❌", budget_exceeded: "💰",
   };
   return icons[status] || "🐜";

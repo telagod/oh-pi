@@ -95,7 +95,7 @@ export interface AntStreamEvent {
 export interface ColonyState {
   id: string;
   goal: string;
-  status: "scouting" | "working" | "reviewing" | "done" | "failed" | "budget_exceeded";
+  status: "scouting" | "planning_recovery" | "working" | "reviewing" | "done" | "failed" | "budget_exceeded";
   tasks: Task[];
   ants: Ant[];
   pheromones: Pheromone[];

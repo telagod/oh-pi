@@ -2,6 +2,7 @@ import type { AntCaste, Pheromone, PheromoneType } from "./types.js";
 import { makePheromoneId } from "./spawner.js";
 
 const VALID_CASTES = new Set(["scout", "worker", "soldier", "drone"]);
+const TASK_HEADER_RE = /^\s*#{2,6}\s*(?:task|任务)\s*[：:]\s*(.+?)\s*$/i;
 
 export interface ParsedSubTask {
   title: string;
@@ -12,44 +13,138 @@ export interface ParsedSubTask {
   context?: string;
 }
 
-export function parseSubTasks(output: string): ParsedSubTask[] {
-  // Try JSON block first
-  const jsonMatch = output.match(/```json\s*([\s\S]*?)```/);
-  if (jsonMatch?.[1]) {
-    try {
-      const parsed = JSON.parse(jsonMatch[1].trim());
-      const arr = Array.isArray(parsed) ? parsed : [parsed];
-      return arr.map((t: Record<string, unknown>) => ({
-        title: String(t.title || "Untitled"),
-        description: String(t.description || t.title || ""),
-        files: Array.isArray(t.files) ? t.files.map(String) : String(t.files || "").split(",").map((f: string) => f.trim()).filter(Boolean),
-        caste: (VALID_CASTES.has(String(t.caste)) ? String(t.caste) : "worker") as AntCaste,
-        priority: (Math.min(5, Math.max(1, parseInt(String(t.priority || "3")))) as 1 | 2 | 3 | 4 | 5),
-        context: t.context ? String(t.context) : undefined,
-      }));
-    } catch { /* fallback to regex */ }
+function normalizePriority(v: unknown): 1 | 2 | 3 | 4 | 5 {
+  const n = parseInt(String(v ?? "3"), 10);
+  return Math.min(5, Math.max(1, Number.isNaN(n) ? 3 : n)) as 1 | 2 | 3 | 4 | 5;
+}
+
+function normalizeCaste(v: unknown): AntCaste {
+  const raw = String(v ?? "worker").trim().toLowerCase();
+  if (VALID_CASTES.has(raw)) return raw as AntCaste;
+  if (raw.includes("侦察") || raw.includes("scout")) return "scout";
+  if (raw.includes("工") || raw.includes("worker")) return "worker";
+  if (raw.includes("兵") || raw.includes("review") || raw.includes("soldier")) return "soldier";
+  if (raw.includes("drone") || raw.includes("bash") || raw.includes("shell")) return "drone";
+  return "worker";
+}
+
+function extractFileLike(value: string): string[] {
+  const normalized = value.replace(/[，、；;]/g, ",").replace(/["']/g, "").replace(/`/g, "");
+  const tokens = normalized.split(",").map(s => s.trim()).filter(Boolean);
+  const fileish = tokens
+    .map(t => t.replace(/^\.?\//, ""))
+    .filter(t => /[./\\]/.test(t) || /\.[a-z0-9]+$/i.test(t));
+  return [...new Set(fileish)];
+}
+
+function normalizeJsonTasks(parsed: unknown): ParsedSubTask[] {
+  const arr = (Array.isArray(parsed) ? parsed : [parsed]) as Array<Record<string, unknown>>;
+  return arr.map((t) => ({
+    title: String(t.title || "Untitled"),
+    description: String(t.description || t.title || ""),
+    files: Array.isArray(t.files)
+      ? t.files.map(String).map(f => f.trim()).filter(Boolean)
+      : extractFileLike(String(t.files || "")),
+    caste: normalizeCaste(t.caste),
+    priority: normalizePriority(t.priority),
+    context: t.context ? String(t.context) : undefined,
+  }));
+}
+
+function parseTasksFromStructuredLines(output: string): ParsedSubTask[] {
+  const lines = output.split(/\r?\n/);
+  const tasks: ParsedSubTask[] = [];
+
+  let current: ParsedSubTask | null = null;
+
+  const flushCurrent = () => {
+    if (!current) return;
+    current.title = current.title.trim() || "Untitled";
+    current.description = current.description.trim() || current.title;
+    current.files = [...new Set(current.files.map(f => f.trim()).filter(Boolean))];
+    current.priority = normalizePriority(current.priority);
+    current.caste = normalizeCaste(current.caste);
+    if (current.context) current.context = current.context.trim();
+    tasks.push(current);
+    current = null;
+  };
+
+  const fieldMatch = (line: string) => {
+    return line.match(/^\s*(?:[-*]|\d+\.)?\s*(?:\*\*|__)?\s*(description|desc|描述|说明|files?|文件|路径|caste|role|角色|priority|prio|优先级|context|上下文)\s*(?:\*\*|__)?\s*[：:]\s*(.*)$/i);
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const header = line.match(TASK_HEADER_RE);
+    if (header) {
+      flushCurrent();
+      current = {
+        title: header[1]?.trim() || "Untitled",
+        description: "",
+        files: [],
+        caste: "worker",
+        priority: 3,
+      };
+      continue;
+    }
+
+    if (!current) continue;
+
+    const m = fieldMatch(line);
+    if (!m) continue;
+
+    const key = m[1].toLowerCase();
+    const value = (m[2] || "").trim();
+
+    if (["description", "desc", "描述", "说明"].includes(key)) {
+      current.description = value;
+      continue;
+    }
+
+    if (["files", "file", "文件", "路径"].includes(key)) {
+      current.files.push(...extractFileLike(value));
+      continue;
+    }
+
+    if (["caste", "role", "角色"].includes(key)) {
+      current.caste = normalizeCaste(value);
+      continue;
+    }
+
+    if (["priority", "prio", "优先级"].includes(key)) {
+      current.priority = normalizePriority(value);
+      continue;
+    }
+
+    if (["context", "上下文"].includes(key)) {
+      const contextLines = [value];
+      while (i + 1 < lines.length) {
+        const next = lines[i + 1];
+        if (TASK_HEADER_RE.test(next) || fieldMatch(next)) break;
+        if (/^\s*#{1,6}\s+/.test(next)) break;
+        contextLines.push(next);
+        i++;
+      }
+      current.context = contextLines.join("\n").trim();
+    }
   }
 
-  // Fallback: regex parsing with per-task try-catch
-  const tasks: ParsedSubTask[] = [];
-  const regex = /### TASK:\s*(.+)\n(?:- description:\s*(.+)\n)?(?:- files:\s*(.+)\n)?(?:- caste:\s*(\w+)\n)?(?:- priority:\s*(\d))?/g;
-  const taskBlocks = output.split(/(?=### TASK:)/);
-  for (const m of output.matchAll(regex)) {
-    try {
-      const block = taskBlocks.find(b => b.includes(`### TASK: ${m[1]?.trim()}`)) || "";
-      const ctxMatch = block.match(/- context:\s*([\s\S]*?)(?=### TASK:|## |\n\n|$)/);
-      const context = ctxMatch?.[1]?.trim() || undefined;
-      tasks.push({
-        title: m[1]?.trim() || "Untitled",
-        description: m[2]?.trim() || m[1]?.trim() || "",
-        files: (m[3]?.trim() || "").split(",").map((f: string) => f.trim()).filter(Boolean),
-        caste: (VALID_CASTES.has(m[4]?.trim() ?? "") ? m[4]!.trim() : "worker") as AntCaste,
-        priority: (parseInt(m[5] || "3") as 1 | 2 | 3 | 4 | 5) || 3,
-        context,
-      });
-    } catch { /* skip malformed task, continue */ }
-  }
+  flushCurrent();
   return tasks;
+}
+
+export function parseSubTasks(output: string): ParsedSubTask[] {
+  // 1) JSON fenced block
+  const jsonMatch = output.match(/```json\s*([\s\S]*?)```/i);
+  if (jsonMatch?.[1]) {
+    try {
+      return normalizeJsonTasks(JSON.parse(jsonMatch[1].trim()));
+    } catch { /* fallback */ }
+  }
+
+  // 2) Structured markdown task blocks (English/Chinese)
+  return parseTasksFromStructuredLines(output);
 }
 
 export function extractPheromones(antId: string, caste: AntCaste, taskId: string, output: string, files: string[], failed = false): Pheromone[] {
