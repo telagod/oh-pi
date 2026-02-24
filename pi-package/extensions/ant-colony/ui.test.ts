@@ -25,10 +25,12 @@ describe("formatTokens", () => {
 });
 
 describe("statusIcon", () => {
+  it("launched", () => expect(statusIcon("launched")).toBe("🚀"));
   it("scouting", () => expect(statusIcon("scouting")).toBe("🔍"));
   it("working", () => expect(statusIcon("working")).toBe("⚒️"));
   it("planning_recovery", () => expect(statusIcon("planning_recovery")).toBe("♻️"));
   it("reviewing", () => expect(statusIcon("reviewing")).toBe("🛡️"));
+  it("task_done", () => expect(statusIcon("task_done")).toBe("✅"));
   it("done", () => expect(statusIcon("done")).toBe("✅"));
   it("failed", () => expect(statusIcon("failed")).toBe("❌"));
   it("budget_exceeded", () => expect(statusIcon("budget_exceeded")).toBe("💰"));
@@ -36,8 +38,10 @@ describe("statusIcon", () => {
 });
 
 describe("statusLabel", () => {
+  it("launched", () => expect(statusLabel("launched")).toBe("LAUNCHED"));
   it("scouting", () => expect(statusLabel("scouting")).toBe("SCOUTING"));
   it("planning_recovery", () => expect(statusLabel("planning_recovery")).toBe("PLAN_RECOVERY"));
+  it("task_done", () => expect(statusLabel("task_done")).toBe("TASK_DONE"));
   it("unknown", () => expect(statusLabel("custom")).toBe("CUSTOM"));
 });
 

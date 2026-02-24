@@ -38,12 +38,19 @@ interface AntStreamState {
   tokens: number;
 }
 
+interface ColonyLogEntry {
+  timestamp: number;
+  level: "info" | "warning" | "error";
+  text: string;
+}
+
 interface BackgroundColony {
   goal: string;
   abortController: AbortController;
   state: ColonyState | null;
   phase: string;
   antStreams: Map<string, AntStreamState>;
+  logs: ColonyLogEntry[];
   promise: Promise<ColonyState>;
 }
 
@@ -58,6 +65,11 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   };
 
   const trim = (text: string, max: number) => text.length > max ? `${text.slice(0, Math.max(0, max - 1))}…` : text;
+
+  const pushLog = (colony: BackgroundColony, entry: Omit<ColonyLogEntry, "timestamp">) => {
+    colony.logs.push({ timestamp: Date.now(), ...entry });
+    if (colony.logs.length > 40) colony.logs.splice(0, colony.logs.length - 40);
+  };
 
   // ─── Status 渲染 ───
 
@@ -173,8 +185,11 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       state: null,
       phase: "initializing",
       antStreams: new Map(),
+      logs: [],
       promise: null as any, // set below
     };
+
+    pushLog(colony, { level: "info", text: "INITIALIZING · Colony launched in background" });
 
     let lastPhase = "";
 
@@ -185,6 +200,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         if (signal.phase !== lastPhase) {
           lastPhase = signal.phase;
           const pct = Math.round(signal.progress * 100);
+          pushLog(colony, { level: "info", text: `${statusLabel(signal.phase)} ${pct}% · ${signal.message}` });
           pi.sendMessage({
             customType: "ant-colony-progress",
             content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] 🐜 ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
@@ -195,6 +211,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       },
       onPhase(phase, detail) {
         colony.phase = detail;
+        pushLog(colony, { level: "info", text: `${statusLabel(phase)} · ${detail}` });
         throttledRender();
       },
       onAntSpawn(ant, task) {
@@ -210,6 +227,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         const icon = ant.status === "done" ? "✓" : "✗";
         const progress = m ? `${m.tasksDone}/${m.tasksTotal}` : "";
         const cost = m ? formatCost(m.totalCost) : "";
+        pushLog(colony, {
+          level: ant.status === "done" ? "info" : "warning",
+          text: `${icon} ${task.title.slice(0, 80)} (${progress}${cost ? `, ${cost}` : ""})`,
+        });
         pi.sendMessage({
           customType: "ant-colony-progress",
           content: `[COLONY_SIGNAL:TASK_DONE] 🐜 ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
@@ -232,6 +253,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       onComplete(state) {
         colony.state = state;
         colony.phase = state.status === "done" ? "Colony mission complete" : "Colony failed";
+        pushLog(colony, {
+          level: state.status === "done" ? "info" : "error",
+          text: `${statusLabel(state.status)} · ${state.metrics.tasksDone}/${state.metrics.tasksTotal} · ${formatCost(state.metrics.totalCost)}`,
+        });
         colony.antStreams.clear();
         throttledRender();
       },
@@ -262,6 +287,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       const ok = state.status === "done";
       const report = buildReport(state);
       const m = state.metrics;
+      pushLog(colony, {
+        level: ok ? "info" : "error",
+        text: `${ok ? "COMPLETE" : "FAILED"} · ${m.tasksDone}/${m.tasksTotal} · ${formatCost(m.totalCost)}`,
+      });
 
       // 清理 UI
       pi.events.emit("ant-colony:clear-ui");
@@ -279,6 +308,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         level: ok ? "success" : "error",
       });
     }).catch((e) => {
+      pushLog(colony, { level: "error", text: `CRASHED · ${String(e).slice(0, 120)}` });
       pi.events.emit("ant-colony:clear-ui");
       activeColony = null;
       pi.events.emit("ant-colony:notify", { msg: `🐜 Colony crashed: ${e}`, level: "error" });
@@ -293,6 +323,29 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
 
 
+
+  // ═══ Custom message renderer for colony progress signals ═══
+  pi.registerMessageRenderer("ant-colony-progress", (message, theme) => {
+    const content = typeof message.content === "string" ? message.content : "";
+    const line = content.split("\n")[0] || content;
+    const phaseMatch = line.match(/\[COLONY_SIGNAL:([A-Z_]+)\]/);
+    const text = line.replace(/\[COLONY_SIGNAL:[A-Z_]+\]\s*/, "").trim();
+
+    const phase = phaseMatch?.[1]?.toLowerCase() || "working";
+    const icon = statusIcon(phase);
+    const label = statusLabel(phase);
+
+    const body = trim(text, 120);
+    const coloredBody = phase === "failed"
+      ? theme.fg("error", body)
+      : phase === "budget_exceeded"
+        ? theme.fg("warning", body)
+        : phase === "done" || phase === "complete"
+          ? theme.fg("success", body)
+          : theme.fg("muted", body);
+
+    return new Text(`${icon} ${theme.fg("toolTitle", theme.bold(label))} ${coloredBody}`, 0, 0);
+  });
 
   // ═══ Custom message renderer for colony reports ═══
   pi.registerMessageRenderer("ant-colony-report", (message, theme) => {
@@ -397,7 +450,30 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             lines.push("");
           }
 
-          lines.push("");
+          // ── Warnings ──
+          const failedTasks = tasks.filter(t => t.status === "failed");
+          if (failedTasks.length > 0) {
+            lines.push(theme.fg("warning", `  Warnings (${failedTasks.length})`));
+            for (const t of failedTasks.slice(0, 4)) {
+              lines.push(`  ${theme.fg("error", "✗")} ${theme.fg("text", trim(t.title, w - 8))}`);
+            }
+            if (failedTasks.length > 4) lines.push(theme.fg("muted", `  ⋯ +${failedTasks.length - 4} more failed tasks`));
+            lines.push("");
+          }
+
+          // ── Recent Signals ──
+          const recentLogs = c.logs.slice(-6);
+          if (recentLogs.length > 0) {
+            lines.push(theme.fg("accent", "  Recent Signals"));
+            const now = Date.now();
+            for (const log of recentLogs) {
+              const age = formatDuration(Math.max(0, now - log.timestamp));
+              const levelIcon = log.level === "error" ? theme.fg("error", "✗") : log.level === "warning" ? theme.fg("warning", "!") : theme.fg("muted", "•");
+              lines.push(`  ${levelIcon} ${theme.fg("dim", age)} ${theme.fg("text", trim(log.text, w - 12))}`);
+            }
+            lines.push("");
+          }
+
           lines.push(theme.fg("muted", "  esc close"));
           return lines;
         };
@@ -541,6 +617,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     ];
 
     if (c.phase && c.phase !== "initializing") lines.push(`Phase: ${trim(c.phase, 100)}`);
+    const lastLog = c.logs[c.logs.length - 1];
+    if (lastLog) lines.push(`Last: ${trim(lastLog.text, 100)}`);
     if (m && m.tasksFailed > 0) lines.push(`⚠ ${m.tasksFailed} failed`);
 
     return lines.join("\n");

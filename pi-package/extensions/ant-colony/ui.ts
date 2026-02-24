@@ -17,19 +17,30 @@ export function formatTokens(n: number): string {
 
 export function statusIcon(status: string): string {
   const icons: Record<string, string> = {
-    scouting: "🔍", planning_recovery: "♻️", working: "⚒️", reviewing: "🛡️",
-    done: "✅", failed: "❌", budget_exceeded: "💰",
+    launched: "🚀",
+    scouting: "🔍",
+    planning_recovery: "♻️",
+    working: "⚒️",
+    reviewing: "🛡️",
+    task_done: "✅",
+    done: "✅",
+    complete: "✅",
+    failed: "❌",
+    budget_exceeded: "💰",
   };
   return icons[status] || "🐜";
 }
 
 export function statusLabel(status: string): string {
   const labels: Record<string, string> = {
+    launched: "LAUNCHED",
     scouting: "SCOUTING",
     planning_recovery: "PLAN_RECOVERY",
     working: "WORKING",
     reviewing: "REVIEWING",
+    task_done: "TASK_DONE",
     done: "DONE",
+    complete: "COMPLETE",
     failed: "FAILED",
     budget_exceeded: "BUDGET",
   };
