@@ -40,8 +40,9 @@ describe("statusIcon", () => {
 describe("statusLabel", () => {
   it("launched", () => expect(statusLabel("launched")).toBe("LAUNCHED"));
   it("scouting", () => expect(statusLabel("scouting")).toBe("SCOUTING"));
-  it("planning_recovery", () => expect(statusLabel("planning_recovery")).toBe("PLAN_RECOVERY"));
+  it("planning_recovery", () => expect(statusLabel("planning_recovery")).toBe("PLANNING_RECOVERY"));
   it("task_done", () => expect(statusLabel("task_done")).toBe("TASK_DONE"));
+  it("budget_exceeded", () => expect(statusLabel("budget_exceeded")).toBe("BUDGET_EXCEEDED"));
   it("unknown", () => expect(statusLabel("custom")).toBe("CUSTOM"));
 });
 

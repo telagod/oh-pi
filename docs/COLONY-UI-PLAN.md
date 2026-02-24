@@ -24,8 +24,8 @@
 - [x] 支持按任务状态过滤（done/active/failed/all）。
 
 ### P3：视觉一致性
-- 统一信号文本与 UI 标签命名（如 `PLANNING_RECOVERY` 的展示文案）。
-- 为深色/浅色主题检查对比度，避免 dim 文本过暗。
+- [x] 统一信号文本与 UI 标签命名（如 `PLANNING_RECOVERY` / `BUDGET_EXCEEDED` 的展示文案）。
+- [ ] 为深色/浅色主题检查对比度，避免 dim 文本过暗（本轮已先提升关键行对比度）。
 
 ## 3) 验收标准
 

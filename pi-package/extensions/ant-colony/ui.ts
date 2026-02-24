@@ -35,14 +35,14 @@ export function statusLabel(status: string): string {
   const labels: Record<string, string> = {
     launched: "LAUNCHED",
     scouting: "SCOUTING",
-    planning_recovery: "PLAN_RECOVERY",
+    planning_recovery: "PLANNING_RECOVERY",
     working: "WORKING",
     reviewing: "REVIEWING",
     task_done: "TASK_DONE",
     done: "DONE",
     complete: "COMPLETE",
     failed: "FAILED",
-    budget_exceeded: "BUDGET",
+    budget_exceeded: "BUDGET_EXCEEDED",
   };
   return labels[status] || status.toUpperCase();
 }

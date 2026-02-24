@@ -416,9 +416,9 @@ export default function antColonyExtension(pi: ExtensionAPI) {
           const barWidth = Math.max(10, Math.min(24, w - 28));
 
           lines.push(theme.fg("accent", theme.bold(`  🐜 Colony Details`)) + theme.fg("muted", ` │ ${elapsed} │ ${cost}`));
-          lines.push(theme.fg("dim", `  Goal: ${trim(c.goal, w - 8)}`));
+          lines.push(theme.fg("muted", `  Goal: ${trim(c.goal, w - 8)}`));
           lines.push(`  ${statusIcon(phase)} ${theme.bold(statusLabel(phase))} │ ${m ? `${m.tasksDone}/${m.tasksTotal}` : "0/0"} │ ${pct}% │ ⚡${activeAnts}`);
-          lines.push(theme.fg("dim", `  ${progressBar(progress, barWidth)} ${pct}%`));
+          lines.push(theme.fg("muted", `  ${progressBar(progress, barWidth)} ${pct}%`));
           if (c.phase && c.phase !== "initializing") {
             lines.push(theme.fg("muted", `  Phase: ${trim(c.phase, w - 10)}`));
           }
@@ -451,7 +451,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             lines.push(theme.fg("accent", "  Tasks"));
             lines.push(theme.fg("muted", `  done:${counts.done} │ active:${counts.active} │ pending:${counts.pending} │ failed:${counts.failed}`));
             lines.push(theme.fg("muted", "  Filter: [0] all  [a] active  [d] done  [f] failed"));
-            lines.push(theme.fg("dim", `  Current filter: ${taskFilter.toUpperCase()}`));
+            lines.push(theme.fg("muted", `  Current filter: ${taskFilter.toUpperCase()}`));
             lines.push("");
 
             const filtered = tasks.filter(t =>
@@ -462,7 +462,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             );
 
             if (filtered.length === 0) {
-              lines.push(theme.fg("dim", "  (no tasks match current filter)"));
+              lines.push(theme.fg("muted", "  (no tasks match current filter)"));
             } else {
               for (const t of filtered.slice(0, 16)) {
                 const icon = t.status === "done" ? theme.fg("success", "✓")
@@ -483,7 +483,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             lines.push(theme.fg("muted", "  Shows latest line + token count for active ants"));
             lines.push("");
             if (streams.length === 0) {
-              lines.push(theme.fg("dim", "  (no active streams right now)"));
+              lines.push(theme.fg("muted", "  (no active streams right now)"));
             } else {
               for (const s of streams.slice(0, 10)) {
                 const excerpt = trim((s.lastLine || "...").replace(/\s+/g, " "), Math.max(20, w - 24));
@@ -509,7 +509,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             const recentLogs = c.logs.slice(-12);
             lines.push(theme.fg("accent", "  Recent Signals"));
             if (recentLogs.length === 0) {
-              lines.push(theme.fg("dim", "  (no signal logs yet)"));
+              lines.push(theme.fg("muted", "  (no signal logs yet)"));
             } else {
               const now = Date.now();
               for (const log of recentLogs) {
