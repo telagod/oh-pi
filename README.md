@@ -96,6 +96,16 @@ oh-pi:
   ✅ Done — report auto-injected into conversation
 ```
 
+### What's new in v0.1.75
+
+- **Planning Recovery Loop**: if scouts return unstructured intel, colony enters `planning_recovery` instead of failing immediately.
+- **Plan Validation Gate**: before workers start, tasks are validated (title/description/caste/priority).
+- **Scout Quorum for complex goals**: multi-step goals default to at least 2 scouts for better planning reliability.
+
+### Colony lifecycle (simple)
+
+`SCOUTING → (if needed) PLANNING_RECOVERY → WORKING → REVIEWING → DONE`
+
 ### Architecture
 
 Each ant is an in-process `AgentSession` (pi SDK), not a child process:
@@ -139,14 +149,19 @@ Use `/colony-stop` to abort a running colony.
 
 ### Signal Protocol
 
-The colony communicates with the main conversation via structured signals, preventing the LLM from polling or guessing colony status:
+The colony communicates with the main conversation via structured signals, so the model never has to guess background state:
 
 | Signal | Meaning |
 |--------|---------|
-| `COLONY_SIGNAL:LAUNCHED` | Colony started — don't poll |
-| `COLONY_SIGNAL:RUNNING` | Colony active — injected each turn |
-| `COLONY_SIGNAL:COMPLETE` | Colony finished — review report |
-| `COLONY_SIGNAL:FAILED` | Colony crashed — report error |
+| `COLONY_SIGNAL:LAUNCHED` | Colony started in background |
+| `COLONY_SIGNAL:SCOUTING` | Scout wave is exploring / planning |
+| `COLONY_SIGNAL:PLANNING_RECOVERY` | Plan recovery loop is restructuring tasks |
+| `COLONY_SIGNAL:WORKING` | Worker phase is executing tasks |
+| `COLONY_SIGNAL:REVIEWING` | Soldier review phase is active |
+| `COLONY_SIGNAL:TASK_DONE` | A task finished (progress checkpoint) |
+| `COLONY_SIGNAL:COMPLETE` | Colony finished and report injected |
+| `COLONY_SIGNAL:FAILED` | Colony failed with diagnostics |
+| `COLONY_SIGNAL:BUDGET_EXCEEDED` | Budget limit reached |
 
 ### Turn Control
 

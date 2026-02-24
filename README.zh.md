@@ -96,6 +96,16 @@ oh-pi:
   ✅ 完成 — 报告自动注入对话
 ```
 
+### v0.1.75 更新亮点
+
+- **Planning Recovery 回路**：当 scout 产出非结构化情报时，进入 `planning_recovery`，而不是直接失败。
+- **执行前计划校验**：worker 启动前会校验任务字段完整性（title/description/caste/priority）。
+- **复杂目标 Scout Quorum**：多步骤目标默认至少 2 个 scout，提升规划可靠性。
+
+### 生命周期（简化）
+
+`SCOUTING →（必要时）PLANNING_RECOVERY → WORKING → REVIEWING → DONE`
+
 ### 架构
 
 每只蚂蚁是进程内的 `AgentSession`（pi SDK），而非子进程：
@@ -139,14 +149,19 @@ pi（主进程）
 
 ### 信号协议
 
-蚁群通过结构化信号与主对话通信，防止 LLM 轮询或猜测蚁群状态：
+蚁群通过结构化信号与主对话通信，让模型无需猜测后台状态：
 
 | 信号 | 含义 |
 |------|------|
-| `COLONY_SIGNAL:LAUNCHED` | 蚁群已启动 — 不要轮询 |
-| `COLONY_SIGNAL:RUNNING` | 蚁群运行中 — 每轮注入 |
-| `COLONY_SIGNAL:COMPLETE` | 蚁群完成 — 查看报告 |
-| `COLONY_SIGNAL:FAILED` | 蚁群崩溃 — 报告错误 |
+| `COLONY_SIGNAL:LAUNCHED` | 蚁群已在后台启动 |
+| `COLONY_SIGNAL:SCOUTING` | 侦察波次正在探索/规划 |
+| `COLONY_SIGNAL:PLANNING_RECOVERY` | 计划恢复回路正在重组任务 |
+| `COLONY_SIGNAL:WORKING` | 工蚁执行阶段进行中 |
+| `COLONY_SIGNAL:REVIEWING` | 兵蚁审查阶段进行中 |
+| `COLONY_SIGNAL:TASK_DONE` | 单个任务完成（进度检查点） |
+| `COLONY_SIGNAL:COMPLETE` | 蚁群完成并注入报告 |
+| `COLONY_SIGNAL:FAILED` | 蚁群失败并附带诊断信息 |
+| `COLONY_SIGNAL:BUDGET_EXCEEDED` | 达到预算上限 |
 
 ### 轮次控制
 
