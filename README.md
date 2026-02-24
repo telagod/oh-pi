@@ -22,27 +22,28 @@ npx oh-pi
 
 ---
 
-## Why
-
-pi-coding-agent is powerful out of the box. But configuring providers, themes, extensions, skills, and prompts by hand is tedious. oh-pi gives you a modern TUI that does it all in under a minute — and ships an **ant colony swarm** that turns pi into a multi-agent system.
-
-## Quick Start
+## 30-Second Start
 
 ```bash
 npx oh-pi    # configure everything
 pi           # start coding
 ```
 
-That's it. oh-pi detects your environment, walks you through setup, and writes `~/.pi/agent/` for you.
+oh-pi auto-detects your environment, guides setup in a modern TUI, and writes `~/.pi/agent/` for you.
 
-Already have a config? oh-pi detects it and offers **backup before overwriting**.
+Already configured? It detects existing files and offers **backup before overwriting**.
 
-## Start Here (Positioning & Growth)
+## 2-Minute Value
 
-If you're evaluating direction, start with:
+pi-coding-agent is powerful by default, but manual setup across providers, themes, extensions, skills, and prompts is slow. oh-pi compresses that setup into under a minute — then adds an **ant colony swarm** for multi-agent execution.
 
-- [`ROADMAP.md`](./ROADMAP.md) — product positioning split, milestones, and success metrics
-- [`docs/DEMO-SCRIPT.zh.md`](./docs/DEMO-SCRIPT.zh.md) — 2-minute demo script for the first “aha moment”
+Want the fast walkthrough? See [`docs/DEMO-SCRIPT.md`](./docs/DEMO-SCRIPT.md).
+
+## When Not to Use Ant Colony
+
+Use plain pi workflows (without colony) when your task is tiny, highly exploratory, or needs constant human steering.
+
+For positioning, scope, and milestones, see [`ROADMAP.md`](./ROADMAP.md). For rationale behind key trade-offs, see [`DECISIONS.md`](./DECISIONS.md).
 
 ## What You Get
 
