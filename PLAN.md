@@ -109,10 +109,10 @@
 
 ## 4. 立刻执行（本周）
 
-- [ ] 补齐 `README.fr.md` 首屏与中英一致（定位统一）
+- [x] 补齐 `README.fr.md` 首屏与中英一致（定位统一）
 - [ ] 产出 2 分钟 asciinema（含字幕版）
 - [ ] 建立 `benchmarks/` 目录与任务模板（先空框架）
-- [ ] 起草 `PheromoneStore` 接口草案 PR（不改行为，仅抽象）
+- [x] 起草 `PheromoneStore` 接口草案（见 `docs/PHEROMONE-STORE.md`）
 
 ---
 

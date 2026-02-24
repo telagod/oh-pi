@@ -45,3 +45,24 @@
 ### Consequences
 - Better signal concentration and tighter feedback loop.
 - Non-priority language communities may get slower narrative updates initially.
+
+---
+
+## D-003: Introduce storage and SDK boundary abstractions before deeper optimization
+- **Date:** 2026-02-24
+- **Status:** Accepted
+
+### Context
+- Pheromone persistence currently relies on local JSONL behavior tightly coupled in `nest` flow.
+- `spawner` directly depends on multiple pi SDK APIs, increasing upstream change risk.
+- Further optimization without boundaries would amplify maintenance cost.
+
+### Decision
+1. Define a `PheromoneStore` interface first, keep JSONL as default implementation.
+2. Make decay policy configurable (global + per-caste overrides).
+3. Introduce a `PiAdapter` anti-corruption layer before major colony feature expansion.
+
+### Consequences
+- Near-term refactor overhead increases, but change risk is localized long-term.
+- Future SQLite/Redis experiments become feasible without queen-level rewrites.
+- SDK upgrades should mostly be absorbed in adapter layer, not core scheduling logic.
