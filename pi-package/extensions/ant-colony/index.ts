@@ -368,7 +368,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     const taskLines = content.split("\n").filter(l => l.startsWith("- ✓") || l.startsWith("- ✗"));
     for (const l of taskLines.slice(0, 8)) {
       const icon = l.startsWith("- ✓") ? theme.fg("success", "✓") : theme.fg("error", "✗");
-      container.addChild(new Text(`  ${icon} ${theme.fg("dim", l.slice(4).trim().slice(0, 70))}`, 0, 0));
+      container.addChild(new Text(`  ${icon} ${theme.fg("muted", l.slice(4).trim().slice(0, 70))}`, 0, 0));
     }
     if (taskLines.length > 8) {
       container.addChild(new Text(theme.fg("muted", `  ⋯ +${taskLines.length - 8} more`), 0, 0));
@@ -487,7 +487,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
             } else {
               for (const s of streams.slice(0, 10)) {
                 const excerpt = trim((s.lastLine || "...").replace(/\s+/g, " "), Math.max(20, w - 24));
-                lines.push(`  ${casteIcon(s.caste)} ${theme.fg("dim", s.antId.slice(0, 12))} ${theme.fg("muted", `${formatTokens(s.tokens)}t`)} ${theme.fg("text", excerpt)}`);
+                lines.push(`  ${casteIcon(s.caste)} ${theme.fg("muted", s.antId.slice(0, 12))} ${theme.fg("muted", `${formatTokens(s.tokens)}t`)} ${theme.fg("text", excerpt)}`);
               }
               if (streams.length > 10) lines.push(theme.fg("muted", `  ⋯ +${streams.length - 10} more streams`));
             }
@@ -515,7 +515,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
               for (const log of recentLogs) {
                 const age = formatDuration(Math.max(0, now - log.timestamp));
                 const levelIcon = log.level === "error" ? theme.fg("error", "✗") : log.level === "warning" ? theme.fg("warning", "!") : theme.fg("muted", "•");
-                lines.push(`  ${levelIcon} ${theme.fg("dim", age)} ${theme.fg("text", trim(log.text, w - 12))}`);
+                lines.push(`  ${levelIcon} ${theme.fg("muted", age)} ${theme.fg("text", trim(log.text, w - 12))}`);
               }
             }
             lines.push("");
@@ -636,7 +636,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       let text = theme.fg("toolTitle", theme.bold("🐜 ant_colony"));
       if (args.maxAnts) text += theme.fg("muted", ` ×${args.maxAnts}`);
       if (args.maxCost) text += theme.fg("warning", ` $${args.maxCost}`);
-      text += "\n" + theme.fg("dim", `  ${goal || "..."}`);
+      text += "\n" + theme.fg("muted", `  ${goal || "..."}`);
       return new Text(text, 0, 0);
     },
 
@@ -651,7 +651,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
         0, 0,
       ));
       if (activeColony) {
-        container.addChild(new Text(theme.fg("dim", `  Goal: ${activeColony.goal.slice(0, 70)}`), 0, 0));
+        container.addChild(new Text(theme.fg("muted", `  Goal: ${activeColony.goal.slice(0, 70)}`), 0, 0));
         container.addChild(new Text(theme.fg("muted", `  Ctrl+Shift+A for details │ /colony-stop to cancel`), 0, 0));
       }
       return container;

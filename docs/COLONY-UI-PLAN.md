@@ -25,7 +25,7 @@
 
 ### P3：视觉一致性
 - [x] 统一信号文本与 UI 标签命名（如 `PLANNING_RECOVERY` / `BUDGET_EXCEEDED` 的展示文案）。
-- [ ] 为深色/浅色主题检查对比度，避免 dim 文本过暗（本轮已先提升关键行对比度）。
+- [x] 完成首轮主题对比度巡检并收敛色阶用法（见 `docs/COLONY-UI-CONTRAST-AUDIT.md`）。
 
 ## 3) 验收标准
 

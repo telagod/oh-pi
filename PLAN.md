@@ -30,7 +30,7 @@
 - [x] README 首屏统一为三段：30 秒上手 / 2 分钟价值 / 不适用场景（中英法）
 - [ ] 发布 2 分钟演示（asciinema + GIF + 文本脚本）
 - [ ] 在 README 增加「oh-pi vs ant-colony」边界图
-- [x] 蚁群 UI 快速可读性优化（状态栏/详情面板），见 `docs/COLONY-UI-PLAN.md`
+- [x] 蚁群 UI 快速可读性优化（状态栏/详情面板），见 `docs/COLONY-UI-PLAN.md` 与 `docs/COLONY-UI-CONTRAST-AUDIT.md`
 
 ### DoD
 - 新用户 3 分钟内可完成：安装 → 配置 → 首次有效运行
