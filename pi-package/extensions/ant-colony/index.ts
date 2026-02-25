@@ -59,6 +59,44 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   // 当前运行中的后台蚁群（同时只允许一个）
   let activeColony: BackgroundColony | null = null;
 
+  // 防止主进程主动轮询导致阻塞：仅允许显式请求的手动快照，并加冷却
+  let lastBgStatusSnapshotAt = 0;
+  const STATUS_SNAPSHOT_COOLDOWN_MS = 15_000;
+
+  const extractMessageText = (message: any): string => {
+    const c = message?.content;
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) {
+      return c.map((p: any) => {
+        if (typeof p === "string") return p;
+        if (typeof p?.text === "string") return p.text;
+        if (typeof p?.content === "string") return p.content;
+        return "";
+      }).join("\n");
+    }
+    return "";
+  };
+
+  const lastUserMessageText = (ctx: any): string => {
+    try {
+      const branch = ctx?.sessionManager?.getBranch?.() ?? [];
+      for (let i = branch.length - 1; i >= 0; i--) {
+        const e = branch[i];
+        if (e?.type === "message" && e.message?.role === "user") {
+          return extractMessageText(e.message).trim();
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return "";
+  };
+
+  const isExplicitStatusRequest = (ctx: any): boolean => {
+    const text = lastUserMessageText(ctx);
+    return /(?:\/colony-status|bg_colony_status)|(?:(?:蚁群|colony).{0,20}(?:状态|进度|进展|汇报|快照|status|progress|snapshot|update|check))|(?:(?:状态|进度|进展|汇报|快照|status|progress|snapshot|update|check).{0,20}(?:蚁群|colony))/i.test(text);
+  };
+
   const calcProgress = (m?: ColonyMetrics | null) => {
     if (!m || m.tasksTotal <= 0) return 0;
     return Math.max(0, Math.min(1, m.tasksDone / m.tasksTotal));
@@ -280,6 +318,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
     colony.promise = resume ? resumeColony(colonyOpts) : runColony(colonyOpts);
 
     activeColony = colony;
+    lastBgStatusSnapshotAt = 0;
     throttledRender();
 
     // 后台等待完成，注入结果
@@ -627,7 +666,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
       launchBackgroundColony(colonyParams);
 
       return {
-        content: [{ type: "text", text: `[COLONY_SIGNAL:LAUNCHED]\n🐜 Colony launched in background.\nGoal: ${params.goal}\n\nThe colony is now running autonomously. Results will be injected when it finishes.` }],
+        content: [{ type: "text", text: `[COLONY_SIGNAL:LAUNCHED]\n🐜 Colony launched in background.\nGoal: ${params.goal}\n\nThe colony runs autonomously in passive mode. Progress is pushed via [COLONY_SIGNAL:*] follow-up messages. Do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.` }],
       };
     },
 
@@ -689,9 +728,40 @@ export default function antColonyExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "bg_colony_status",
     label: "Colony Status",
-    description: "Check the status of a running background ant colony. Use this instead of bg_status to monitor colony progress.",
+    description: "Optional manual snapshot for a running colony. Progress is pushed passively via COLONY_SIGNAL follow-up messages; call this only when the user explicitly asks.",
     parameters: Type.Object({}),
-    async execute() {
+    async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+      if (!activeColony) {
+        return {
+          content: [{ type: "text" as const, text: "No colony is currently running." }],
+        };
+      }
+
+      const explicit = isExplicitStatusRequest(ctx);
+      if (!explicit) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: "Passive mode is active. Colony progress is already pushed via [COLONY_SIGNAL:*] follow-up messages. Skipping bg_colony_status polling to avoid blocking the main process. Ask explicitly for a manual snapshot if needed.",
+          }],
+          isError: true,
+        };
+      }
+
+      const now = Date.now();
+      const delta = now - lastBgStatusSnapshotAt;
+      if (delta < STATUS_SNAPSHOT_COOLDOWN_MS) {
+        const waitSec = Math.ceil((STATUS_SNAPSHOT_COOLDOWN_MS - delta) / 1000);
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Manual status snapshot is rate-limited. Please wait ${waitSec}s to avoid active polling loops.`,
+          }],
+          isError: true,
+        };
+      }
+
+      lastBgStatusSnapshotAt = now;
       return {
         content: [{ type: "text" as const, text: buildStatusText() }],
       };

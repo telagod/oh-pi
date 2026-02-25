@@ -54,7 +54,6 @@ export const EXTENSIONS = [
   { name: "compact-header",    label: "⚡ Compact Header — Dense startup info replacing verbose output", default: true },
   { name: "ant-colony",        label: "🐜 Ant Colony — Autonomous multi-agent swarm with adaptive concurrency", default: false },
   { name: "auto-update",       label: "🔄 Auto Update — Check for oh-pi updates on startup and notify", default: true },
-  { name: "smart-compact",     label: "🗜️  Smart Compact — Trim large tool outputs and old messages in-flight", default: true },
   { name: "bg-process",        label: "⏳ Bg Process — Auto-background long-running commands (dev servers, etc.)", default: false },
 ];
 

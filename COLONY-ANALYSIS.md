@@ -71,7 +71,7 @@
 │  │  ├─ custom-footer       └─ security-researcher      ┃   │        │
 │  │  ├─ git-guard                                       ┃   │        │
 │  │  ├─ safe-guard      skills/ (×10)    themes/ (×6)   ┃   │        │
-│  │  └─ smart-compact   ├─ claymorphism   ├─ nord       ┃   │        │
+│  │                     ├─ claymorphism   ├─ nord       ┃   │        │
 │  │                      ├─ context7       ├─ cyberpunk  ┃   │        │
 │  │                      ├─ debug-helper   ├─ gruvbox    ┃   │        │
 │  │                      ├─ git-workflow   ├─ tokyo      ┃   │        │

@@ -157,7 +157,7 @@ Use `/colony-stop` to abort a running colony.
 
 ### Signal Protocol
 
-The colony communicates with the main conversation via structured signals, so the model never has to guess background state:
+The colony communicates with the main conversation via structured signals, so the model never has to guess background state. Updates are passively pushed (non-blocking), so polling is optional:
 
 | Signal | Meaning |
 |--------|---------|

@@ -17,8 +17,9 @@ You command an autonomous ant colony. Complex tasks are delegated to the swarm, 
 ## Workflow
 1. Assess task scope
 2. If colony-worthy → use `ant_colony` tool with clear goal
-3. If simple → do it directly
-4. Review colony output, fix gaps manually if needed
+3. After launch, use passive mode: wait for `COLONY_SIGNAL:*` updates; do not poll `bg_colony_status` unless user explicitly asks
+4. If simple → do it directly
+5. Review colony output, fix gaps manually if needed
 
 ## Code Standards
 - Follow existing conventions
