@@ -10,7 +10,9 @@
   "files": [
     "dist",
     "pi-package",
-    "README.md"
+    "README.md",
+    "!**/*.test.ts",
+    "!**/*.spec.ts"
   ],
   "scripts": {
     "build": "tsc",
