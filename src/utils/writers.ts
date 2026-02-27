@@ -5,6 +5,16 @@ import { KEYBINDING_SCHEMES, MODEL_CAPABILITIES, PROVIDERS } from "../registry.j
 import { resources } from "./resources.js";
 import { ensureDir, syncDir } from "./install.js";
 
+const ANT_COLONY_AUTOTRIGGER_GUIDE = `## Ant Colony Auto-Trigger
+If the ant_colony tool is available, automatically use it when the task is complex:
+- 3 or more files likely need changes
+- 2 or more independent workstreams exist
+- large refactor / migration / feature implementation
+
+For simple one-file tasks, execute directly without colony overhead.
+After launching ant_colony, use passive mode: wait for COLONY_SIGNAL updates and do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.
+`;
+
 /** 步骤 1-2: 生成 auth.json + settings.json */
 export function writeProviderEnv(agentDir: string, config: OhPConfig) {
   // auth.json
@@ -104,6 +114,9 @@ export function writeAgents(agentDir: string, config: OhPConfig) {
       const langNames: Record<string, string> = { zh: "Chinese (中文)", fr: "French (Français)" };
       const lang = langNames[config.locale] ?? config.locale;
       content = `## Language\nAlways respond in ${lang}. Use the user's language for all conversations and explanations. Code, commands, and technical terms can remain in English.\n\n${content}`;
+    }
+    if (config.extensions.includes("ant-colony") && config.agents !== "colony-operator") {
+      content = `${content.trimEnd()}\n\n${ANT_COLONY_AUTOTRIGGER_GUIDE}`;
     }
     writeFileSync(join(agentDir, "AGENTS.md"), content);
   } catch { /* template not found, skip */ }
