@@ -21,10 +21,33 @@ export function countExisting(env: EnvInfo, dir: string): number {
  * @param env - 当前环境信息
  */
 export async function confirmApply(config: OhPConfig, env: EnvInfo) {
+  const keepProviders = config.providerStrategy === "keep";
+  const addProviders = config.providerStrategy === "add";
+  const providerNames = keepProviders || addProviders
+    ? t("confirm.skipped")
+    : (config.providers.length > 0 ? config.providers.map(p => p.name).join(", ") : t("confirm.none"));
+  const primaryModel = keepProviders
+    ? t("confirm.skipped")
+    : addProviders
+    ? t("confirm.skipped")
+    : (config.providers[0]?.defaultModel || t("confirm.none"));
+  const fallbackProviders = keepProviders
+    ? t("confirm.skipped")
+    : addProviders
+    ? (config.providers.length > 0 ? config.providers.map(p => p.name).join(", ") : t("confirm.none"))
+    : (config.providers.length > 1 ? config.providers.slice(1).map(p => p.name).join(", ") : t("confirm.none"));
+  const providerStrategy = keepProviders
+    ? t("confirm.providerStrategyKeep")
+    : addProviders
+    ? t("confirm.providerStrategyAdd")
+    : t("confirm.providerStrategyReplace");
+
   // ═══ Summary ═══
   const summary = [
-    `${t("confirm.providers")}  ${chalk.cyan(config.providers.length > 0 ? config.providers.map(p => p.name).join(", ") : t("confirm.skipped"))}`,
-    `${t("confirm.model")}      ${chalk.cyan(config.providers[0]?.defaultModel || t("confirm.skipped"))}`,
+    `${t("confirm.providerStrategy")} ${chalk.cyan(providerStrategy)}`,
+    `${t("confirm.providers")}  ${chalk.cyan(providerNames)}`,
+    `${t("confirm.model")}      ${chalk.cyan(primaryModel)}`,
+    `${t("confirm.fallbackProviders")} ${chalk.cyan(fallbackProviders)}`,
     `${t("confirm.theme")}      ${chalk.cyan(config.theme)}`,
     `${t("confirm.keybindings")}${chalk.cyan(config.keybindings)}`,
     `${t("confirm.thinking")}   ${chalk.cyan(config.thinking)}`,

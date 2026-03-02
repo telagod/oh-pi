@@ -1,5 +1,6 @@
 /** 支持的语言区域 */
 export type Locale = "en" | "zh" | "fr";
+export type ProviderSetupStrategy = "keep" | "replace" | "add";
 
 /** 动态发现的模型信息 */
 export interface DiscoveredModel {
@@ -38,6 +39,8 @@ export interface ProviderConfig {
 export interface OhPConfig {
   /** 已配置的提供商列表 */
   providers: ProviderConfig[];
+  /** Provider 配置策略：保留现有、替换，或在现有基础上新增 */
+  providerStrategy?: ProviderSetupStrategy;
   /** 主题名称 */
   theme: string;
   /** 快捷键方案 */

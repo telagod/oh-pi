@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isUnsafeUrl } from "./provider-setup.js";
+import { isUnsafeUrl, resolveOpenAIApiMode } from "./provider-setup.js";
 
 describe("isUnsafeUrl", () => {
   it("https remote is safe", () => {
@@ -48,5 +48,23 @@ describe("isUnsafeUrl", () => {
 
   it("empty string is unsafe", () => {
     expect(isUnsafeUrl("")).toBe(true);
+  });
+});
+
+describe("resolveOpenAIApiMode", () => {
+  it("keeps explicit responses mode", () => {
+    expect(resolveOpenAIApiMode("openai-responses", "gpt-4o")).toBe("openai-responses");
+  });
+
+  it("keeps explicit completions mode", () => {
+    expect(resolveOpenAIApiMode("openai-completions", "o3-mini")).toBe("openai-completions");
+  });
+
+  it("auto resolves o-series to responses", () => {
+    expect(resolveOpenAIApiMode("auto", "o3-mini")).toBe("openai-responses");
+  });
+
+  it("auto resolves gpt-4o to completions", () => {
+    expect(resolveOpenAIApiMode("auto", "gpt-4o")).toBe("openai-completions");
   });
 });

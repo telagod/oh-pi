@@ -42,9 +42,9 @@ export async function run() {
  * @returns 生成的配置对象
  */
 async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
-  const providers = await setupProviders(env);
+  const providerSetup = await setupProviders(env);
   return {
-    providers,
+    ...providerSetup,
     theme: "dark",
     keybindings: "default",
     extensions: ["safe-guard", "git-guard", "auto-session-name", "custom-footer", "compact-header", "auto-update"],
@@ -61,8 +61,8 @@ async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
  */
 async function presetFlow(env: EnvInfo): Promise<OhPConfig> {
   const preset = await selectPreset();
-  const providers = await setupProviders(env);
-  return { ...preset, providers };
+  const providerSetup = await setupProviders(env);
+  return { ...preset, ...providerSetup };
 }
 
 /**
@@ -71,7 +71,7 @@ async function presetFlow(env: EnvInfo): Promise<OhPConfig> {
  * @returns 生成的配置对象
  */
 async function customFlow(env: EnvInfo): Promise<OhPConfig> {
-  const providers = await setupProviders(env);
+  const providerSetup = await setupProviders(env);
   const theme = await selectTheme();
   const keybindings = await selectKeybindings();
   const extensions = await selectExtensions();
@@ -85,7 +85,7 @@ async function customFlow(env: EnvInfo): Promise<OhPConfig> {
   if (p.isCancel(wantAdvanced)) { p.cancel(t("cancelled")); process.exit(0); }
 
   return {
-    providers,
+    ...providerSetup,
     theme,
     keybindings,
     extensions,

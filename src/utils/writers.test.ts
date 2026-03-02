@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { OhPConfig } from "../types.js";
-import { writeAgents } from "./writers.js";
+import { writeAgents, writeProviderEnv, writeModelConfig } from "./writers.js";
 
 const tempDirs: string[] = [];
 
@@ -67,5 +67,125 @@ describe("writeAgents", () => {
     const content = readFileSync(join(dir, "AGENTS.md"), "utf8");
     expect(content).not.toContain("## Ant Colony Auto-Trigger");
     expect(content).toContain("You command an autonomous ant colony");
+  });
+});
+
+describe("provider keep strategy", () => {
+  it("writeProviderEnv does not touch settings/auth when strategy is keep", () => {
+    const dir = makeTempDir();
+    const settingsPath = join(dir, "settings.json");
+    const authPath = join(dir, "auth.json");
+    const originalSettings = JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-4o" }, null, 2);
+    const originalAuth = JSON.stringify({ openai: { type: "api_key", key: "OPENAI_API_KEY" } }, null, 2);
+    writeFileSync(settingsPath, originalSettings);
+    writeFileSync(authPath, originalAuth);
+
+    writeProviderEnv(dir, makeConfig({
+      providerStrategy: "keep",
+      providers: [],
+    }));
+
+    expect(readFileSync(settingsPath, "utf8")).toBe(originalSettings);
+    expect(readFileSync(authPath, "utf8")).toBe(originalAuth);
+  });
+
+  it("writeModelConfig does not touch models.json when strategy is keep", () => {
+    const dir = makeTempDir();
+    const modelsPath = join(dir, "models.json");
+    const originalModels = JSON.stringify({
+      providers: {
+        openai: { baseUrl: "https://api.openai.com", api: "openai-responses" },
+      },
+    }, null, 2);
+    writeFileSync(modelsPath, originalModels);
+
+    writeModelConfig(dir, makeConfig({
+      providerStrategy: "keep",
+      providers: [],
+    }));
+
+    expect(readFileSync(modelsPath, "utf8")).toBe(originalModels);
+  });
+
+  it("writeModelConfig creates custom provider entries when replacing", () => {
+    const dir = makeTempDir();
+    writeModelConfig(dir, makeConfig({
+      providerStrategy: "replace",
+      providers: [{
+        name: "custom-openai",
+        apiKey: "OPENAI_API_KEY",
+        baseUrl: "https://api.openai.com",
+        defaultModel: "gpt-4o",
+        api: "openai-responses",
+      }],
+    }));
+
+    const modelsPath = join(dir, "models.json");
+    expect(existsSync(modelsPath)).toBe(true);
+    const text = readFileSync(modelsPath, "utf8");
+    expect(text).toContain("\"custom-openai\"");
+    expect(text).toContain("\"openai-responses\"");
+  });
+
+  it("writeProviderEnv merges auth/settings when strategy is add", () => {
+    const dir = makeTempDir();
+    const settingsPath = join(dir, "settings.json");
+    const authPath = join(dir, "auth.json");
+    writeFileSync(settingsPath, JSON.stringify({
+      defaultProvider: "anthropic",
+      defaultModel: "claude-sonnet-4-20250514",
+      enabledModels: ["claude-sonnet-4-20250514"],
+      theme: "dark",
+    }, null, 2));
+    writeFileSync(authPath, JSON.stringify({
+      anthropic: { type: "api_key", key: "ANTHROPIC_API_KEY" },
+    }, null, 2));
+
+    writeProviderEnv(dir, makeConfig({
+      providerStrategy: "add",
+      theme: "light",
+      providers: [{
+        name: "openai",
+        apiKey: "OPENAI_API_KEY",
+        defaultModel: "gpt-4o",
+        discoveredModels: [{ id: "gpt-4o", reasoning: false, input: ["text", "image"], contextWindow: 128000, maxTokens: 16384 }],
+      }],
+    }));
+
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    const auth = JSON.parse(readFileSync(authPath, "utf8"));
+    expect(settings.defaultProvider).toBe("anthropic");
+    expect(settings.defaultModel).toBe("claude-sonnet-4-20250514");
+    expect(settings.theme).toBe("light");
+    expect(settings.enabledModels).toContain("claude-sonnet-4-20250514");
+    expect(settings.enabledModels).toContain("gpt-4o");
+    expect(auth.anthropic).toBeTruthy();
+    expect(auth.openai).toEqual({ type: "api_key", key: "OPENAI_API_KEY" });
+  });
+
+  it("writeModelConfig merges custom providers when strategy is add", () => {
+    const dir = makeTempDir();
+    const modelsPath = join(dir, "models.json");
+    writeFileSync(modelsPath, JSON.stringify({
+      providers: {
+        existing: { baseUrl: "https://example.com/v1", api: "openai-completions" },
+      },
+    }, null, 2));
+
+    writeModelConfig(dir, makeConfig({
+      providerStrategy: "add",
+      providers: [{
+        name: "custom-openai",
+        apiKey: "OPENAI_API_KEY",
+        baseUrl: "https://api.openai.com",
+        defaultModel: "gpt-4o",
+        api: "openai-responses",
+      }],
+    }));
+
+    const models = JSON.parse(readFileSync(modelsPath, "utf8"));
+    expect(models.providers.existing).toBeTruthy();
+    expect(models.providers["custom-openai"]).toBeTruthy();
+    expect(JSON.stringify(models.providers["custom-openai"])).toContain("openai-responses");
   });
 });

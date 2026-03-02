@@ -15,19 +15,36 @@ For simple one-file tasks, execute directly without colony overhead.
 After launching ant_colony, use passive mode: wait for COLONY_SIGNAL updates and do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.
 `;
 
+function readJson<T>(file: string): T | null {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
 /** 步骤 1-2: 生成 auth.json + settings.json */
 export function writeProviderEnv(agentDir: string, config: OhPConfig) {
+  if (config.providerStrategy === "keep") return;
+  const strategy = config.providerStrategy ?? "replace";
+  const authPath = join(agentDir, "auth.json");
+  const settingsPath = join(agentDir, "settings.json");
+
   // auth.json
   const authProviders = config.providers.filter(p => !p.baseUrl && p.apiKey !== "none");
   if (authProviders.length > 0) {
-    const auth: Record<string, { type: string; key: string }> = {};
+    const auth: Record<string, { type: string; key: string }> =
+      strategy === "add" ? (readJson<Record<string, { type: string; key: string }>>(authPath) ?? {}) : {};
     for (const p of authProviders) {
       auth[p.name] = { type: "api_key", key: p.apiKey };
     }
-    writeFileSync(join(agentDir, "auth.json"), JSON.stringify(auth, null, 2), { mode: 0o600 });
+    writeFileSync(authPath, JSON.stringify(auth, null, 2), { mode: 0o600 });
   }
 
   // settings.json
+  const existingSettings = strategy === "add"
+    ? (readJson<Record<string, unknown>>(settingsPath) ?? {})
+    : {};
   const primary = config.providers.find(p => p.baseUrl && p.defaultModel) ?? config.providers[0];
   const providerInfo = primary ? PROVIDERS[primary.name] : undefined;
   const primaryModelId = primary?.defaultModel ?? providerInfo?.models[0];
@@ -36,8 +53,19 @@ export function writeProviderEnv(agentDir: string, config: OhPConfig) {
   const reserveTokens = Math.max(16384, Math.round(ctxWindow * 0.15));
   const keepRecentTokens = Math.max(16384, Math.round(ctxWindow * 0.15));
   const primaryModel = primary?.defaultModel ?? providerInfo?.models[0];
+
+  const defaultProviderModel =
+    strategy === "add"
+      ? (
+          (!existingSettings.defaultProvider && primary)
+            ? { defaultProvider: primary.name, defaultModel: primaryModel }
+            : {}
+        )
+      : (primary ? { defaultProvider: primary.name, defaultModel: primaryModel } : {});
+
   const settings: Record<string, unknown> = {
-    ...(primary ? { defaultProvider: primary.name, defaultModel: primaryModel } : {}),
+    ...existingSettings,
+    ...defaultProviderModel,
     defaultThinkingLevel: config.thinking,
     theme: config.theme,
     enableSkillCommands: true,
@@ -45,22 +73,36 @@ export function writeProviderEnv(agentDir: string, config: OhPConfig) {
     retry: { enabled: true, maxRetries: 3 },
     quietStartup: true,
   };
-  if (config.providers.length > 1) {
-    settings.enabledModels = config.providers.flatMap((p) => {
-      if (p.discoveredModels?.length) return p.discoveredModels.map(m => m.id);
-      const info = PROVIDERS[p.name];
-      return info ? info.models : [];
-    });
+
+  const nextEnabledModels = config.providers.flatMap((p) => {
+    if (p.discoveredModels?.length) return p.discoveredModels.map(m => m.id);
+    const info = PROVIDERS[p.name];
+    return info ? info.models : [];
+  });
+  if (strategy === "add") {
+    const current = Array.isArray(existingSettings.enabledModels)
+      ? (existingSettings.enabledModels as string[])
+      : [];
+    const merged = [...new Set([...current, ...nextEnabledModels])];
+    if (merged.length > 0) settings.enabledModels = merged;
+  } else if (config.providers.length > 1) {
+    settings.enabledModels = nextEnabledModels;
   }
-  writeFileSync(join(agentDir, "settings.json"), JSON.stringify(settings, null, 2));
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 /** 步骤 3: 生成 models.json（自定义端点） */
 export function writeModelConfig(agentDir: string, config: OhPConfig) {
+  if (config.providerStrategy === "keep") return;
+  const strategy = config.providerStrategy ?? "replace";
+  const modelsPath = join(agentDir, "models.json");
+
   const customProviders = config.providers.filter(p => p.baseUrl);
   if (customProviders.length === 0) return;
 
-  const providers: Record<string, unknown> = {};
+  const providers: Record<string, unknown> = strategy === "add"
+    ? (readJson<{ providers?: Record<string, unknown> }>(modelsPath)?.providers ?? {})
+    : {};
   for (const cp of customProviders) {
     const isBuiltin = !!PROVIDERS[cp.name];
     if (isBuiltin && !cp.discoveredModels?.length) {
@@ -94,7 +136,7 @@ export function writeModelConfig(agentDir: string, config: OhPConfig) {
       providers[cp.name] = entry;
     }
   }
-  writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers }, null, 2));
+  writeFileSync(modelsPath, JSON.stringify({ providers }, null, 2));
 }
 
 /** 步骤 4: 生成 keybindings.json */
