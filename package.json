@@ -1,6 +1,6 @@
 {
   "name": "oh-pi",
-  "version": "0.1.84",
+  "version": "0.1.85",
   "description": "One-click setup for pi-coding-agent. Like oh-my-zsh for pi.",
   "type": "module",
   "bin": {
@@ -15,7 +15,8 @@
     "!**/*.spec.ts"
   ],
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{ recursive: true, force: true })\"",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
     "start": "node dist/bin/oh-pi.js",
     "test": "vitest run",
