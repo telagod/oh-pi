@@ -34,9 +34,12 @@ Pour ce dépôt :
 
 Plan de renommage :
 - Marque : `Agent Colony`
-- Futur nom canonique repo/package : `pi-agent-colony`
+- Nom canonique repo/package : `pi-agent-colony`
 - [`docs/RENAMING-PLAN.md`](./docs/RENAMING-PLAN.md)
 - [`docs/RENAME-EXECUTION-CHECKLIST.md`](./docs/RENAME-EXECUTION-CHECKLIST.md)
+- [`docs/MIGRATION-MATRIX.md`](./docs/MIGRATION-MATRIX.md)
+- [`docs/RELEASE-SEQUENCING.md`](./docs/RELEASE-SEQUENCING.md)
+- [`docs/MIGRATION-ANNOUNCEMENT.md`](./docs/MIGRATION-ANNOUNCEMENT.md)
 
 ## Nouveau positionnement
 
@@ -64,12 +67,32 @@ Ant Colony ne cherche pas à remplacer pi. Son objectif est de lui donner une co
 ## Démarrage en 30 secondes
 
 ```bash
-npx oh-pi    # point d’entrée bootstrap actuel pour Ant Colony for Pi
-pi           # utiliser la colonie dans pi
+npx oh-pi             # chemin legacy/bootstrap pendant la transition
+npx pi-agent-colony   # chemin d’installation canonique
+pi                    # utiliser la colonie dans pi
 ```
 
-Pour l’instant, `oh-pi` installe et relie encore les fichiers dans `~/.pi/agent/`.
-Mais la direction produit va vers une **identité de plugin autonome plus claire**, pas vers un bundle de configuration toujours plus large.
+Pour l’instant, `oh-pi` reste le nom de compatibilité/bootstrap et continue d’installer les fichiers dans `~/.pi/agent/`.
+Le nom canonique devient progressivement `pi-agent-colony`, tandis que le nom produit public reste **Agent Colony / Agent Colony for Pi**.
+
+## Annonce de migration
+
+Chemin d’installation canonique :
+
+```bash
+npx pi-agent-colony
+pi install npm:pi-agent-colony
+```
+
+Chemin compatible legacy :
+
+```bash
+npx oh-pi
+pi install npm:oh-pi
+```
+
+Détails :
+- [`docs/MIGRATION-ANNOUNCEMENT.md`](./docs/MIGRATION-ANNOUNCEMENT.md)
 
 ## Voir d’abord la valeur de la colonie
 
