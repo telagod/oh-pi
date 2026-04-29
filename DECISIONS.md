@@ -4,7 +4,7 @@
 
 ## D-001: Re-center product identity (oh-pi first, ant-colony optional)
 - **Date:** 2026-02-24
-- **Status:** Accepted
+- **Status:** Superseded by D-004
 
 ### Context
 - ant-colony complexity and code size are growing quickly.
@@ -66,3 +66,40 @@
 - Near-term refactor overhead increases, but change risk is localized long-term.
 - Future SQLite/Redis experiments become feasible without queen-level rewrites.
 - SDK upgrades should mostly be absorbed in adapter layer, not core scheduling logic.
+
+---
+
+## D-004: Re-center around Ant Colony for Pi as the primary product
+- **Date:** 2026-04-29
+- **Status:** Accepted
+
+### Context
+- The strongest differentiated value is no longer setup convenience, but multi-agent execution for complex coding tasks.
+- The current repository mixes two product stories: bootstrap/setup and ant-colony capability.
+- This creates positioning noise: users may remember the installer, but miss the core reason to care.
+- Pi itself is designed to be extended through extensions, so colony should align with that ecosystem shape.
+
+### Decision
+1. Make **Ant Colony for Pi** the primary product identity.
+2. Treat **oh-pi** as the current distribution/bootstrap layer, not the long-term core narrative.
+3. Rewrite docs and demos so the default message is:
+   - what kinds of tasks need colony
+   - how colony improves execution
+   - how it plugs into pi
+4. De-emphasize themes, presets, and convenience packaging as secondary support assets.
+5. Prioritize plugin boundary hardening:
+   - `PiAdapter`
+   - `PheromoneStore`
+   - runtime/integration separation
+
+### Consequences
+- Product messaging becomes sharper and more memorable.
+- Some existing users who came for one-command setup may need migration in expectations.
+- The repo will likely evolve toward clearer separation between colony core and bootstrap/install surfaces.
+- Growth can be driven by benchmark evidence and task-fit clarity, instead of novelty alone.
+
+### Follow-ups
+- Publish a dedicated product boundary document.
+- Rework README and roadmap around colony-first language.
+- Add benchmark evidence for when colony outperforms a single agent.
+- Define transitional naming strategy for `oh-pi` vs `ant-colony` packaging.

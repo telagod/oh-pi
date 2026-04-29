@@ -13,9 +13,9 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 vi.mock("@mariozechner/pi-ai", () => ({ getModel: vi.fn() }));
 
-import { classifyError, quorumMergeTasks, shouldUseScoutQuorum, validateExecutionPlan } from "./queen.js";
-import { Nest } from "./nest.js";
-import type { ColonyState, Task } from "./types.js";
+import { classifyError, quorumMergeTasks, shouldUseScoutQuorum, validateExecutionPlan } from "./core/queen.js";
+import { Nest } from "./core/nest.js";
+import type { ColonyState, Task } from "./core/types.js";
 
 // ═══ classifyError ═══
 

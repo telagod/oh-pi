@@ -9,12 +9,12 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   SettingsManager: { inMemory: vi.fn() }, createExtensionRuntime: vi.fn(),
 }));
 vi.mock("@mariozechner/pi-ai", () => ({ getModel: vi.fn() }));
-vi.mock("./spawner.js", async () => {
-  const actual = await vi.importActual<any>("./spawner.js");
+vi.mock("./core/ids.js", async () => {
+  const actual = await vi.importActual<any>("./core/ids.js");
   return { ...actual, makePheromoneId: () => "p-test" };
 });
 
-import { parseSubTasks, extractPheromones } from "./parser.js";
+import { parseSubTasks, extractPheromones } from "./core/parser.js";
 
 describe("parseSubTasks", () => {
   it("parses markdown TASK blocks", () => {

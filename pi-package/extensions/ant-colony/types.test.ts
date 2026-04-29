@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_ANT_CONFIGS } from "./types.js";
-import type { AntCaste } from "./types.js";
+import { DEFAULT_ANT_CONFIGS } from "./core/types.js";
+import type { AntCaste } from "./core/types.js";
 
 describe("DEFAULT_ANT_CONFIGS", () => {
   const castes: AntCaste[] = ["scout", "worker", "soldier", "drone"];

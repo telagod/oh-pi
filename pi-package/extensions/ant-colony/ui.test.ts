@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { formatDuration, formatCost, formatTokens, statusIcon, statusLabel, progressBar, casteIcon, buildReport } from "./ui.js";
-import type { ColonyState } from "./types.js";
+import { formatDuration, formatCost, formatTokens, statusIcon, statusLabel, progressBar, casteIcon, buildReport } from "./core/ui.js";
+import type { ColonyState } from "./core/types.js";
 
 describe("formatDuration", () => {
   it("0ms", () => expect(formatDuration(0)).toBe("0s"));

@@ -2,11 +2,12 @@
 
 <img src="./logo.svg" width="180" alt="oh-pi logo"/>
 
-# 🐜 oh-pi
+# 🐜 oh-pi / Ant Colony for Pi
 
-**One command to supercharge [pi-coding-agent](https://github.com/badlogic/pi-mono).**
+**Turn [pi-coding-agent](https://github.com/badlogic/pi-mono) from a single coding agent into a collaborative ant-colony execution system.**
 
-Like oh-my-zsh for pi — but with an autonomous ant colony.
+This repository is being re-centered from a general pi setup bundle into a **colony-first plugin for complex coding tasks**.
+`oh-pi` remains the current distribution/bootstrap entrypoint, while **`ant-colony` is the primary capability and long-term product direction**.
 
 [![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
@@ -22,30 +23,100 @@ npx oh-pi
 
 ---
 
+## New Positioning
+
+### This is no longer framed as a “configuration mega-pack”
+
+We are intentionally moving away from defining the product as:
+- a bundle of themes, presets, skills, and convenience setup
+- an “oh-my-zsh for pi” style wrapper
+
+We now define the core as:
+- **Ant Colony for Pi**
+- **a multi-agent plugin for complex coding tasks**
+- **a way to give pi scouting, task decomposition, parallel execution, review, and recovery loops**
+
+### What problem it solves
+
+Single-agent execution starts to strain when a task:
+- touches **3+ files**
+- requires **cross-module understanding or refactoring**
+- can be split into **parallel sub-tasks**
+- needs **post-execution review and repair loops**
+
+Ant Colony is not trying to replace pi. It is trying to give pi a stronger execution layer for tasks that exceed a single agent’s comfort zone.
+
 ## 30-Second Start
 
 ```bash
-npx oh-pi    # configure everything
-pi           # start coding
+npx oh-pi    # current bootstrap entrypoint for Ant Colony for Pi
+pi           # use colony capabilities inside pi
 ```
 
-oh-pi auto-detects your environment, guides setup in a modern TUI, and writes `~/.pi/agent/` for you.
+For now, `oh-pi` still installs and wires everything into `~/.pi/agent/`.
+The product direction, however, is toward a **clearer standalone plugin identity**, not a bigger all-in-one configuration bundle.
 
-Already configured? It detects existing files and offers **backup before overwriting**.
+## Release Status
 
-## 2-Minute Value
+**Ant Colony for Pi is now publishable as a Beta product.**
 
-pi-coding-agent is powerful by default, but manual setup across providers, themes, extensions, skills, and prompts is slow. oh-pi compresses that setup into under a minute — then adds an **ant colony swarm** for multi-agent execution.
+What that means:
+- the colony plugin architecture is in place
+- core and pi integration boundaries are now physically separated in code
+- compatibility wrappers are retained for older import paths
+- the main user flows are implemented and tested
 
-Want the fast walkthrough? See [`docs/DEMO-SCRIPT.md`](./docs/DEMO-SCRIPT.md).
+What it does **not** mean yet:
+- not a 1.0 / GA claim
+- not benchmarked across every provider + environment combination
+- not a promise that every user-facing command or internal import path is frozen forever
+
+## See the colony value first
+
+### If you say
+
+```text
+"Refactor auth from sessions to JWT, add tests, and run a regression pass."
+```
+
+### Ant Colony responds like this
+
+```text
+1. scouts inspect the codebase and identify boundaries
+2. planners generate a task pool and execution order
+3. workers modify separate files or modules in parallel
+4. reviewers validate changes and request repairs if needed
+5. results are summarized back into the main conversation
+```
+
+That is the real product edge here: **complex-task throughput, decomposition quality, and execution reliability**.
+
+- [`docs/DEMO-SCRIPT.md`](./docs/DEMO-SCRIPT.md) — 2-minute walkthrough
+- [`ROADMAP.md`](./ROADMAP.md) — milestones under the new positioning
+- [`DECISIONS.md`](./DECISIONS.md) — product and architecture trade-offs
+- [`docs/PRODUCT.md`](./docs/PRODUCT.md) — product boundary, fit, and non-goals
+- [`docs/ARCHITECTURE-REFACTOR.md`](./docs/ARCHITECTURE-REFACTOR.md) — codebase refactor plan for plugin boundaries
+
+## When to Use Ant Colony
+
+Prefer colony for:
+
+- multi-file changes
+- cross-module refactors
+- new feature decomposition
+- test completion, fixes, and regression checks
+- engineering work that benefits from parallel execution
 
 ## When Not to Use Ant Colony
 
-Use plain pi workflows (without colony) when your task is tiny, highly exploratory, or needs constant human steering.
+Use plain pi workflows when:
 
-For positioning, scope, and milestones, see [`ROADMAP.md`](./ROADMAP.md). For rationale behind key trade-offs, see [`DECISIONS.md`](./DECISIONS.md).
+- only 1 file needs a clear, contained change
+- you need quick Q&A or explanation
+- the task requires strict human step-by-step control
+- the work is fundamentally non-parallel and highly context-concentrated
 
-## What You Get
+## What This Repo Currently Contains
 
 ```
 ~/.pi/agent/
@@ -63,7 +134,7 @@ For positioning, scope, and milestones, see [`ROADMAP.md`](./ROADMAP.md). For ra
 │   ├── bg-process       ⏳ **Bg Process** — Auto-background long-running commands (dev servers, etc.)
 │   └── ant-colony/      🐜 Autonomous multi-agent swarm (optional)
 ├── prompts/             10 templates (/review /fix /commit /test ...)
-├── skills/              11 skills (tools + UI design + workflows)
+├── skills/              10 skills (tools + UI design + workflows)
 └── themes/              6 custom themes
 ```
 
@@ -104,11 +175,13 @@ oh-pi:
   ✅ Done — report auto-injected into conversation
 ```
 
-### What's new in v0.1.75
+### What's new in the current Beta line
 
 - **Planning Recovery Loop**: if scouts return unstructured intel, colony enters `planning_recovery` instead of failing immediately.
 - **Plan Validation Gate**: before workers start, tasks are validated (title/description/caste/priority).
 - **Scout Quorum for complex goals**: multi-step goals default to at least 2 scouts for better planning reliability.
+- **Thin-entry plugin architecture**: real implementations now live in `core/` and `pi/`, with compatibility wrappers preserved.
+- **Background passive progress**: colony progress is pushed back into the session without forcing active polling.
 
 ### Colony lifecycle (simple)
 
@@ -189,6 +262,21 @@ The colony auto-detects available models and lets the LLM pick the best fit per 
 
 Omit model overrides to use the current session model for every ant.
 
+## Beta Capability Matrix
+
+| Capability | Status | Notes |
+|-----------|--------|-------|
+| Colony tool launch (`ant_colony`) | ✅ Beta-ready | Background in UI sessions, sync in print/no-UI mode |
+| Scout → worker → soldier lifecycle | ✅ Beta-ready | Includes planning recovery and review phase |
+| Passive progress signals | ✅ Beta-ready | `COLONY_SIGNAL:*` follow-up updates |
+| Manual snapshot / stop / resume | ✅ Beta-ready | `bg_colony_status`, `/colony-stop`, `/colony-resume` |
+| Detail overlay | ✅ Beta-ready | `Ctrl+Shift+A` |
+| Adaptive concurrency | ✅ Beta-ready | CPU / memory / rate-limit aware |
+| Checkpoint resume | ✅ Beta-ready | Resumable nest state in `.ant-colony/` |
+| Import-path compatibility wrappers | ✅ Beta-ready | Root-level wrappers forward to real `core/` and `pi/` modules |
+| Provider coverage across all environments | ⚠️ Partial | Core flow works, but broad cross-provider smoke coverage is still limited |
+| Stable long-term plugin API guarantee | ⚠️ Not yet | Treat current surface as Beta |
+
 ### Cost Reporting
 
 The colony tracks cost per ant and total spend, reported in the final summary. **Cost never interrupts execution** — turn limits and concurrency control handle resource management.
@@ -220,7 +308,7 @@ One ant per file. Always. Conflicting tasks are automatically blocked and resume
 
 ## Skills
 
-oh-pi ships 11 skills in three categories.
+oh-pi ships 10 skills in three categories.
 
 ### 🔧 Tool Skills
 
@@ -302,15 +390,35 @@ pi loads liquid-glass skill → applies --lg- tokens, glass effects, specular hi
 | Data & AI Engineer | MLOps & pipelines |
 | 🐜 Colony Operator | Multi-agent orchestration |
 
-## Also a Pi Package
+## Install Paths
 
-Skip the configurator, just install the resources:
+### Option 1: bootstrap install
+
+```bash
+npx oh-pi
+```
+
+Use this if you want the guided setup flow.
+
+### Option 2: install as a Pi package
 
 ```bash
 pi install npm:oh-pi
 ```
 
-Adds all themes, prompts, skills, and extensions to your existing pi setup.
+Use this if you already have Pi and want to add the packaged resources directly.
+
+This currently adds themes, prompts, skills, and extensions, including `ant-colony`.
+
+### Option 3: use the extension source directly
+
+See [`pi-package/extensions/ant-colony/README.md`](./pi-package/extensions/ant-colony/README.md) for the extension-level layout and direct integration notes.
+
+## Release Artifacts
+
+- [Release checklist](./RELEASE-CHECKLIST.md)
+- [Changelog](./CHANGELOG.md)
+- [Release notes for v0.1.85](./RELEASE-NOTES-v0.1.85.md)
 
 ## Requirements
 

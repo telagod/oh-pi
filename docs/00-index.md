@@ -81,19 +81,19 @@ CLI flags > 项目 .pi/settings.json > 全局 ~/.pi/agent/settings.json
 --api-key > auth.json > 环境变量 > models.json
 ```
 
-## 对 oh-pi 项目的价值
+## 对 Ant Colony for Pi / oh-pi 项目的价值
 
-本文档为 oh-pi（一键配置 pi-coding-agent 的项目）提供完整的知识基础：
+本文档为 Ant Colony for Pi（以及当前的 oh-pi bootstrap 层）提供完整的知识基础：
 
-1. **配置项全览** — 知道 settings.json 所有字段，可生成交互式配置
-2. **目录结构** — 知道 `~/.pi/agent/` 和 `.pi/` 下每个文件的作用
-3. **扩展系统** — 可帮用户安装/配置/生成 Extensions
-4. **Skills/Prompts/Themes** — 可帮用户发现、安装、配置
-5. **包管理** — 知道 `pi install/remove/list/update/config` 全部用法
-6. **提供商认证** — 知道所有提供商的 API key 环境变量和 auth.json 格式
-7. **自定义模型** — 知道 models.json 格式，可帮配置 Ollama/vLLM 等
-8. **快捷键** — 知道所有 action 和默认绑定，可生成 keybindings.json
-9. **主题** — 知道 51 个 color token，可生成自定义主题
+1. **扩展系统全貌** — 知道如何把 colony 作为 pi extension 接入，而不是深改宿主
+2. **SDK 与会话模型** — 知道 `createAgentSession`、流式事件、工具注入等边界，支持 `PiAdapter` 设计
+3. **目录结构** — 知道 `~/.pi/agent/` 和 `.pi/` 下每个文件的作用，便于 colony / bootstrap 分层
+4. **包管理** — 知道 `pi install/remove/list/update/config` 全部用法，支持未来插件化分发
+5. **提供商认证** — 知道所有提供商的 API key 环境变量和 auth.json 格式
+6. **自定义模型** — 知道 models.json 格式，可帮 colony 做角色化模型选择
+7. **TUI / 扩展 UI** — 知道如何实现 colony widget、状态面板与交互细节
+8. **Skills/Prompts/Themes** — 作为辅助资产理解，而不再作为主产品定位
+9. **配置能力** — 仍可支持 bootstrap 安装层，但不再是唯一产品重心
 
 ## 原始文档位置
 

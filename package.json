@@ -1,7 +1,7 @@
 {
   "name": "oh-pi",
   "version": "0.1.85",
-  "description": "One-click setup for pi-coding-agent. Like oh-my-zsh for pi.",
+  "description": "Bootstrap and package distribution for Ant Colony for Pi, a multi-agent plugin for complex coding tasks.",
   "type": "module",
   "bin": {
     "oh-pi": "dist/bin/oh-pi.js"
@@ -25,7 +25,9 @@
   "keywords": [
     "pi-package",
     "pi-coding-agent",
-    "configuration",
+    "ant-colony",
+    "multi-agent",
+    "plugin",
     "setup",
     "tui"
   ],

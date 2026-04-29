@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { Nest } from "./nest.js";
-import type { ColonyState, Pheromone } from "./types.js";
+import { Nest } from "./core/nest.js";
+import type { ColonyState, Pheromone } from "./core/types.js";
 
 const mkState = (overrides: Partial<ColonyState> = {}): ColonyState => ({
   id: "test-colony", goal: "test", status: "working",

@@ -1,17 +1,28 @@
-# oh-pi 产品设计文档
+# oh-pi / Ant Colony for Pi 设计文档
 
-> 一键配置 pi-coding-agent 的交互式 TUI 工具
+> 本文档记录的是**早期 bootstrap / 配置器设计**。最新产品定位以 [`docs/PRODUCT.md`](./PRODUCT.md) 为准。
 
-## 一、产品定位
+## 状态说明
 
-**oh-pi** 是 pi-coding-agent 的"开箱即用配置器"。用户运行 `npx oh-pi` 后，通过交互式 TUI 完成：
-- API 接入（多提供商一站式配置）
-- 预置扩展/技能/主题安装
-- 个性化偏好设定
-- 一键生成完整的 `~/.pi/agent/` 配置
+本文原本面向“oh-pi = 一键配置 pi 的交互式 TUI 工具”的产品方向。
 
-类比：oh-my-zsh 之于 zsh，oh-pi 之于 pi。
+当前方向已经调整为：
+- **Ant Colony for Pi** 是主产品
+- **oh-pi** 是当前分发/引导入口
+- 配置、主题、预设、技能装配是辅助层，不再是主叙事
 
+因此，本文后续内容主要保留为：
+- 早期设计记录
+- bootstrap 层参考
+- 交互式安装器资产
+
+如果你正在阅读产品边界、使用场景或中长期定位，请优先看：
+- [`docs/PRODUCT.md`](./PRODUCT.md)
+- [`ROADMAP.md`](../ROADMAP.md)
+- [`DECISIONS.md`](../DECISIONS.md)
+- [`docs/ARCHITECTURE-REFACTOR.md`](./ARCHITECTURE-REFACTOR.md)
+
+## 一、早期产品定位（归档）
 ## 二、交互流程设计
 
 ```

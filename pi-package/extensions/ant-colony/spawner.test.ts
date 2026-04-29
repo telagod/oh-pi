@@ -10,7 +10,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 vi.mock("@mariozechner/pi-ai", () => ({ getModel: vi.fn() }));
 
-import { makeAntId, makePheromoneId, makeTaskId } from "./spawner.js";
+import { makeAntId, makePheromoneId, makeTaskId } from "./core/ids.js";
 
 describe("makeAntId", () => {
   it("includes caste name", () => {

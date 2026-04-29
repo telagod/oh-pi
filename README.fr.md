@@ -2,11 +2,12 @@
 
 <img src="./logo.svg" width="180" alt="oh-pi logo"/>
 
-# 🐜 oh-pi
+# 🐜 oh-pi / Ant Colony for Pi
 
-**Une seule commande pour booster [pi-coding-agent](https://github.com/badlogic/pi-mono).**
+**Transformer [pi-coding-agent](https://github.com/badlogic/pi-mono) d’un agent unique en un système d’exécution collaboratif inspiré d’une colonie de fourmis.**
 
-Comme oh-my-zsh pour pi — mais avec une colonie de fourmis autonome.
+Ce dépôt se recentre progressivement : d’un bundle de configuration pour pi vers un **plugin colony-first pour les tâches de code complexes**.
+`oh-pi` reste aujourd’hui le point d’entrée de distribution/bootstrap, tandis que **`ant-colony` devient la capacité principale et la direction produit de long terme**.
 
 [![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
@@ -22,30 +23,85 @@ npx oh-pi
 
 ---
 
+## Nouveau positionnement
+
+### Ce n’est plus présenté comme un “gros pack de configuration”
+
+Nous nous éloignons volontairement d’une définition du produit comme :
+- un ensemble de thèmes, presets, skills et confort d’installation
+- une surcouche façon “oh-my-zsh pour pi”
+
+Nous définissons désormais le cœur du produit comme :
+- **Ant Colony for Pi**
+- **un plugin multi-agents pour les tâches de code complexes**
+- **un moyen d’ajouter à pi l’exploration, la décomposition, l’exécution parallèle, la revue et la récupération**
+
+### Quel problème cela résout
+
+L’exécution par agent unique commence à montrer ses limites quand une tâche :
+- touche **3 fichiers ou plus**
+- exige une **compréhension ou refactorisation transversale**
+- peut être découpée en **sous-tâches parallèles**
+- nécessite une **boucle de revue et réparation après exécution**
+
+Ant Colony ne cherche pas à remplacer pi. Son objectif est de lui donner une couche d’exécution plus robuste pour les tâches qui dépassent la zone de confort d’un agent unique.
+
 ## Démarrage en 30 secondes
 
 ```bash
-npx oh-pi    # tout configurer
-pi           # commencer à coder
+npx oh-pi    # point d’entrée bootstrap actuel pour Ant Colony for Pi
+pi           # utiliser la colonie dans pi
 ```
 
-oh-pi détecte automatiquement votre environnement, vous guide dans une TUI moderne, puis écrit `~/.pi/agent/`.
+Pour l’instant, `oh-pi` installe et relie encore les fichiers dans `~/.pi/agent/`.
+Mais la direction produit va vers une **identité de plugin autonome plus claire**, pas vers un bundle de configuration toujours plus large.
 
-Déjà configuré ? oh-pi détecte les fichiers existants et propose une **sauvegarde avant écrasement**.
+## Voir d’abord la valeur de la colonie
 
-## Valeur en 2 minutes
+### Si vous dites
 
-pi-coding-agent est puissant par défaut, mais la configuration manuelle (fournisseurs, thèmes, extensions, skills, prompts) prend du temps. oh-pi compresse cette phase en moins d'une minute — puis ajoute la colonie pour les tâches complexes.
+```text
+"Refactorer l’authentification session vers JWT, ajouter les tests, puis lancer une passe de régression."
+```
 
-- [`docs/DEMO-SCRIPT.md`](./docs/DEMO-SCRIPT.md) — démo rapide en 2 minutes
-- [`ROADMAP.md`](./ROADMAP.md) — positionnement, jalons, métriques
-- [`DECISIONS.md`](./DECISIONS.md) — décisions produit et compromis techniques
+### Ant Colony répond ainsi
 
-## Quand ne pas utiliser la colonie
+```text
+1. les scouts inspectent le code et identifient les frontières
+2. les planners génèrent un pool de tâches et un ordre d’exécution
+3. les workers modifient différents fichiers/modules en parallèle
+4. les reviewers valident les changements et demandent des corrections si nécessaire
+5. le résultat est résumé dans la conversation principale
+```
 
-Utilisez le flux pi classique (sans colonie) si la tâche est petite, très exploratoire, ou nécessite un pilotage humain continu.
+C’est là la vraie différence produit : **débit sur tâches complexes, qualité de décomposition et fiabilité d’exécution**.
 
-## Ce que vous obtenez
+- [`docs/DEMO-SCRIPT.md`](./docs/DEMO-SCRIPT.md) — démo rapide de 2 minutes
+- [`ROADMAP.md`](./ROADMAP.md) — jalons sous le nouveau positionnement
+- [`DECISIONS.md`](./DECISIONS.md) — arbitrages produit et architecture
+- [`docs/PRODUCT.md`](./docs/PRODUCT.md) — périmètre produit, cas d’usage et non-objectifs
+- [`docs/ARCHITECTURE-REFACTOR.md`](./docs/ARCHITECTURE-REFACTOR.md) — plan de refactorisation des frontières plugin
+
+## Quand utiliser Ant Colony
+
+Privilégiez la colonie pour :
+
+- les changements multi-fichiers
+- les refactorisations transversales
+- la décomposition de nouvelles fonctionnalités
+- les compléments de tests, corrections et vérifications de régression
+- les travaux d’ingénierie qui bénéficient du parallélisme
+
+## Quand ne pas utiliser Ant Colony
+
+Utilisez le flux pi classique lorsque :
+
+- un seul fichier nécessite une modification claire et contenue
+- vous avez besoin d’une réponse rapide ou d’une explication
+- la tâche demande un contrôle humain strict étape par étape
+- le travail est fondamentalement non parallèle et très concentré en contexte
+
+## Ce que contient actuellement le dépôt
 
 ```
 ~/.pi/agent/
@@ -63,7 +119,7 @@ Utilisez le flux pi classique (sans colonie) si la tâche est petite, très expl
 │   ├── bg-process       ⏳ **Bg Process** — Mise en arrière-plan automatique des commandes longues (serveurs dev, etc.)
 │   └── ant-colony/      🐜 Essaim multi-agents autonome (optionnel)
 ├── prompts/             10 modèles (/review /fix /commit /test ...)
-├── skills/              11 compétences (outils + design UI + workflows)
+├── skills/              10 compétences (outils + design UI + workflows)
 └── themes/              6 thèmes personnalisés
 ```
 
@@ -210,7 +266,7 @@ Une fourmi par fichier. Toujours. Les tâches en conflit sont automatiquement bl
 
 ## Compétences
 
-oh-pi embarque 11 compétences en trois catégories.
+oh-pi embarque 10 compétences en trois catégories.
 
 ### 🔧 Compétences outils
 
