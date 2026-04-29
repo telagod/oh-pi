@@ -9,7 +9,7 @@ This matrix defines how users should install and talk about the project during t
 | Brand | Agent Colony | Agent Colony |
 | Formal product name | Agent Colony for Pi | Agent Colony for Pi |
 | Legacy/bootstrap package name | `oh-pi` | transition only |
-| Canonical future repo/package | not yet live | `pi-agent-colony` |
+| Canonical future repo/package | repo live, package pending | `pi-agent-colony` |
 
 ---
 
@@ -29,7 +29,7 @@ This matrix defines how users should install and talk about the project during t
 |------------|-------------------|---------------------------|-------|
 | Guided/bootstrap install | `npx pi-agent-colony` | `npx oh-pi` | Old command remains during transition |
 | Pi package install | `pi install npm:pi-agent-colony` | `pi install npm:oh-pi` | Prefer canonical name in docs |
-| Repo reference | `github.com/telagod/pi-agent-colony` | old repo URL redirects | GitHub rename should preserve redirects |
+| Repo reference | `github.com/telagod/pi-agent-colony` | old repo URL redirects | Repo rename is now live |
 
 ### Phase 2 — migration window active
 

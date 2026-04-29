@@ -4,9 +4,9 @@ Target repository name:
 
 - **`pi-agent-colony`**
 
-Current repository:
+Current repository after rename:
 
-- `telagod/oh-pi`
+- `telagod/pi-agent-colony`
 
 ## Goal
 
@@ -24,16 +24,13 @@ Rename the GitHub repository so the canonical repository identifier matches the 
 - [x] Release sequencing documented
 - [ ] Canonical npm package prepared
 - [ ] Migration release note drafted
-- [ ] Repo About/description text prepared
+- [x] Repo About/description text prepared
 
 ## GitHub actions to take
 
-1. Open repository settings
-2. Rename repository from `oh-pi` to `pi-agent-colony`
-3. Verify GitHub redirect from old URL remains active
-4. Update About description to Agent Colony wording
-5. Update website/social preview links if needed
-6. Check badges and release links after rename
+1. Verify GitHub redirect from old URL remains active
+2. Update website/social preview links if needed
+3. Check badges and release links after rename
 
 ## Suggested repository description
 
@@ -43,7 +40,7 @@ Rename the GitHub repository so the canonical repository identifier matches the 
 
 - [ ] Old repo URL redirects to new repo URL
 - [ ] GitHub release pages still resolve
-- [ ] Actions still run normally
+- [x] Actions still run normally
 - [ ] README links still render correctly
 - [ ] npm package metadata links are updated when canonical package is published
 

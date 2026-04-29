@@ -1,10 +1,11 @@
 {
-  "name": "oh-pi",
+  "name": "pi-agent-colony",
   "version": "0.1.85",
-  "description": "Ant Colony for Pi — bootstrap and package distribution for a multi-agent Pi plugin for complex coding tasks.",
+  "description": "Agent Colony for Pi — bootstrap and package distribution for a multi-agent Pi plugin for complex coding tasks.",
   "type": "module",
   "bin": {
-    "oh-pi": "dist/bin/oh-pi.js"
+    "oh-pi": "dist/bin/oh-pi.js",
+    "pi-agent-colony": "dist/bin/oh-pi.js"
   },
   "main": "./dist/index.js",
   "files": [
@@ -26,6 +27,8 @@
     "pi-package",
     "pi-coding-agent",
     "ant-colony",
+    "agent-colony",
+    "pi-agent-colony",
     "multi-agent",
     "plugin",
     "setup",

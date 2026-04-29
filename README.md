@@ -10,7 +10,7 @@ This repository is being re-centered from a general pi setup bundle into a **col
 **Ant Colony for Pi** is the primary public product name.
 `oh-pi` remains the current distribution/bootstrap package name during transition, while **`ant-colony` is the primary capability and long-term product direction**.
 
-[![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
+[![npm](https://img.shields.io/npm/v/pi-agent-colony)](https://www.npmjs.com/package/pi-agent-colony)
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
 [![node](https://img.shields.io/node/v/oh-pi)](https://nodejs.org)
 
@@ -18,6 +18,8 @@ This repository is being re-centered from a general pi setup bundle into a **col
 
 ```bash
 npx oh-pi
+# or, once the canonical package is published:
+npx pi-agent-colony
 ```
 
 </div>
@@ -67,8 +69,9 @@ Ant Colony is not trying to replace pi. It is trying to give pi a stronger execu
 ## 30-Second Start
 
 ```bash
-npx oh-pi    # current bootstrap entrypoint for Ant Colony for Pi
-pi           # use colony capabilities inside pi
+npx oh-pi             # legacy/bootstrap install path during transition
+npx pi-agent-colony   # canonical install path once published
+pi                    # use colony capabilities inside pi
 ```
 
 For now, `oh-pi` still installs and wires everything into `~/.pi/agent/`.
@@ -410,25 +413,37 @@ pi loads liquid-glass skill → applies --lg- tokens, glass effects, specular hi
 
 ## Install Paths
 
-### Option 1: bootstrap install
+### Option 1: canonical bootstrap install
+
+```bash
+npx pi-agent-colony
+```
+
+Use this once the canonical package is published.
+
+### Option 2: legacy/bootstrap compatibility install
 
 ```bash
 npx oh-pi
 ```
 
-Use this if you want the guided setup flow.
+Use this during the transition window if you still rely on the legacy package name.
 
-### Option 2: install as a Pi package
+### Option 3: install as a Pi package
+
+```bash
+pi install npm:pi-agent-colony
+```
+
+Legacy-compatible during transition:
 
 ```bash
 pi install npm:oh-pi
 ```
 
-Use this if you already have Pi and want to add the packaged resources directly.
+This adds themes, prompts, skills, and extensions, including `ant-colony`.
 
-This currently adds themes, prompts, skills, and extensions, including `ant-colony`.
-
-### Option 3: use the extension source directly
+### Option 4: use the extension source directly
 
 See [`pi-package/extensions/ant-colony/README.md`](./pi-package/extensions/ant-colony/README.md) for the extension-level layout and direct integration notes.
 
