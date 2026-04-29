@@ -1,10 +1,30 @@
 # Release Notes - v0.1.85
 
-## Ant Colony for Pi Beta
+## Agent Colony for Pi Beta
 
-This release turns the repository into a clearer **colony-first product**.
+This release turns the repository into a clearer **colony-first product** and now also completes the first canonical rename step.
 
-`oh-pi` remains the current install/bootstrap path, but the primary capability is now framed and structured as **Ant Colony for Pi**: a Pi plugin for complex, multi-file, multi-step coding work.
+Current naming model:
+- **Brand:** Agent Colony
+- **Formal product name:** Agent Colony for Pi
+- **Canonical repo/package:** `pi-agent-colony`
+- **Legacy compatibility package:** `oh-pi`
+
+## Canonical install path
+
+New installs should prefer:
+
+```bash
+npx pi-agent-colony
+pi install npm:pi-agent-colony
+```
+
+Legacy-compatible transition path:
+
+```bash
+npx oh-pi
+pi install npm:oh-pi
+```
 
 ## What is ready now
 
@@ -14,6 +34,8 @@ This release turns the repository into a clearer **colony-first product**.
 - Status, stop, resume, and detail panel support
 - Planning recovery, review loop, adaptive concurrency, and checkpoint resume
 - Compatibility wrappers preserved for existing import paths
+- Canonical GitHub repo rename to `pi-agent-colony`
+- Canonical npm package publish as `pi-agent-colony`
 
 ## What this release is not claiming
 
@@ -32,7 +54,7 @@ It is not yet positioned as:
 
 ## Recommended user framing
 
-Use Ant Colony when the task:
+Use Agent Colony when the task:
 - spans 3+ files
 - can be decomposed into sub-tasks
 - benefits from parallel workers and post-change review
@@ -47,3 +69,9 @@ Use plain Pi when the task:
 - `npm test`
 - **21/21 test files passed**
 - **235/235 tests passed**
+
+## Migration note
+
+The project is moving from the legacy bootstrap name `oh-pi` to the canonical package/repository name `pi-agent-colony`.
+
+Existing `oh-pi` users keep a compatibility path during the migration window.

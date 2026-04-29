@@ -458,6 +458,26 @@ Tracking docs:
 - [`docs/RENAME-EXECUTION-CHECKLIST.md`](./docs/RENAME-EXECUTION-CHECKLIST.md)
 - [`docs/MIGRATION-MATRIX.md`](./docs/MIGRATION-MATRIX.md)
 - [`docs/RELEASE-SEQUENCING.md`](./docs/RELEASE-SEQUENCING.md)
+- [`docs/MIGRATION-ANNOUNCEMENT.md`](./docs/MIGRATION-ANNOUNCEMENT.md)
+
+## Migration Announcement
+
+Canonical install path now:
+
+```bash
+npx pi-agent-colony
+pi install npm:pi-agent-colony
+```
+
+Legacy-compatible transition path:
+
+```bash
+npx oh-pi
+pi install npm:oh-pi
+```
+
+Details:
+- [`docs/MIGRATION-ANNOUNCEMENT.md`](./docs/MIGRATION-ANNOUNCEMENT.md)
 
 ## Release Artifacts
 
