@@ -1,7 +1,7 @@
 {
   "name": "oh-pi",
   "version": "0.1.85",
-  "description": "Bootstrap and package distribution for Ant Colony for Pi, a multi-agent plugin for complex coding tasks.",
+  "description": "Ant Colony for Pi — bootstrap and package distribution for a multi-agent Pi plugin for complex coding tasks.",
   "type": "module",
   "bin": {
     "oh-pi": "dist/bin/oh-pi.js"

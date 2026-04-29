@@ -2,12 +2,13 @@
 
 <img src="./logo.svg" width="180" alt="oh-pi logo"/>
 
-# 🐜 oh-pi / Ant Colony for Pi
+# 🐜 Ant Colony for Pi
 
 **Transformer [pi-coding-agent](https://github.com/badlogic/pi-mono) d’un agent unique en un système d’exécution collaboratif inspiré d’une colonie de fourmis.**
 
 Ce dépôt se recentre progressivement : d’un bundle de configuration pour pi vers un **plugin colony-first pour les tâches de code complexes**.
-`oh-pi` reste aujourd’hui le point d’entrée de distribution/bootstrap, tandis que **`ant-colony` devient la capacité principale et la direction produit de long terme**.
+**Ant Colony for Pi** est désormais le nom produit public principal.
+`oh-pi` reste aujourd’hui le nom du package/bootstrap pendant la transition, tandis que **`ant-colony` devient la capacité principale et la direction produit de long terme**.
 
 [![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
@@ -22,6 +23,20 @@ npx oh-pi
 </div>
 
 ---
+
+## Clarification de nommage
+
+Ce projet **n’est pas un fork** et **n’est pas affilié** à l’autre projet portant aussi le nom `oh-pi`.
+
+Pour ce dépôt :
+- **Ant Colony for Pi** = nom produit canonique
+- `oh-pi` = nom actuel du package / bootstrap / transition
+
+Plan de renommage :
+- Marque : `Agent Colony`
+- Futur nom canonique repo/package : `pi-agent-colony`
+- [`docs/RENAMING-PLAN.md`](./docs/RENAMING-PLAN.md)
+- [`docs/RENAME-EXECUTION-CHECKLIST.md`](./docs/RENAME-EXECUTION-CHECKLIST.md)
 
 ## Nouveau positionnement
 

@@ -2,12 +2,13 @@
 
 <img src="./logo.svg" width="180" alt="oh-pi logo"/>
 
-# 🐜 oh-pi / Ant Colony for Pi
+# 🐜 Ant Colony for Pi
 
 **Turn [pi-coding-agent](https://github.com/badlogic/pi-mono) from a single coding agent into a collaborative ant-colony execution system.**
 
 This repository is being re-centered from a general pi setup bundle into a **colony-first plugin for complex coding tasks**.
-`oh-pi` remains the current distribution/bootstrap entrypoint, while **`ant-colony` is the primary capability and long-term product direction**.
+**Ant Colony for Pi** is the primary public product name.
+`oh-pi` remains the current distribution/bootstrap package name during transition, while **`ant-colony` is the primary capability and long-term product direction**.
 
 [![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
@@ -22,6 +23,23 @@ npx oh-pi
 </div>
 
 ---
+
+## Naming Clarification
+
+This project is **not a fork of** and **not affiliated with** the other project also named `oh-pi`.
+
+For this repository:
+- **Ant Colony for Pi** = canonical product name
+- `oh-pi` = current bootstrap / package / transition name
+
+A formal rename path is being prepared to reduce user confusion.
+Current direction:
+- **Brand:** `Agent Colony`
+- **Future canonical repo/package name:** `pi-agent-colony`
+- [`docs/RENAMING-PLAN.md`](./docs/RENAMING-PLAN.md)
+- [`docs/RENAME-EXECUTION-CHECKLIST.md`](./docs/RENAME-EXECUTION-CHECKLIST.md)
+- [`docs/MIGRATION-MATRIX.md`](./docs/MIGRATION-MATRIX.md)
+- [`docs/RELEASE-SEQUENCING.md`](./docs/RELEASE-SEQUENCING.md)
 
 ## New Positioning
 
@@ -413,6 +431,18 @@ This currently adds themes, prompts, skills, and extensions, including `ant-colo
 ### Option 3: use the extension source directly
 
 See [`pi-package/extensions/ant-colony/README.md`](./pi-package/extensions/ant-colony/README.md) for the extension-level layout and direct integration notes.
+
+## Rename Transition
+
+The current short-term plan is:
+- **A:** make `Agent Colony` / `Agent Colony for Pi` the dominant public name everywhere
+- **B:** prepare a full repo/package rename to `pi-agent-colony` with compatibility during migration
+
+Tracking docs:
+- [`docs/RENAMING-PLAN.md`](./docs/RENAMING-PLAN.md)
+- [`docs/RENAME-EXECUTION-CHECKLIST.md`](./docs/RENAME-EXECUTION-CHECKLIST.md)
+- [`docs/MIGRATION-MATRIX.md`](./docs/MIGRATION-MATRIX.md)
+- [`docs/RELEASE-SEQUENCING.md`](./docs/RELEASE-SEQUENCING.md)
 
 ## Release Artifacts
 

@@ -2,12 +2,13 @@
 
 <img src="./logo.svg" width="180" alt="oh-pi logo"/>
 
-# 🐜 oh-pi / Ant Colony for Pi
+# 🐜 Ant Colony for Pi
 
 **把 [pi-coding-agent](https://github.com/badlogic/pi-mono) 从单代理，升级为可协作的蚁群式编码系统。**
 
 当前仓库正从「pi 配置增强包」收敛为「面向复杂任务的 pi 蚁群插件」。
-`oh-pi` 作为现阶段的分发/引导入口保留，**`ant-colony` 是主能力、主叙事、主产品方向**。
+**Ant Colony for Pi** 现在是对外的主产品名称。
+`oh-pi` 作为现阶段的分发/引导包名保留，**`ant-colony` 是主能力、主叙事、主产品方向**。
 
 [![npm](https://img.shields.io/npm/v/oh-pi)](https://www.npmjs.com/package/oh-pi)
 [![license](https://img.shields.io/npm/l/oh-pi)](./LICENSE)
@@ -22,6 +23,20 @@ npx oh-pi
 </div>
 
 ---
+
+## 命名说明
+
+本项目**不是**另一个同名 `oh-pi` 项目的 fork，也**不隶属于**那个项目。
+
+对当前仓库来说：
+- **Ant Colony for Pi** = 标准产品名
+- `oh-pi` = 当前 bootstrap / 包名 / 过渡名称
+
+正式改名迁移方案见：
+- 品牌方向：`Agent Colony`
+- 后续 canonical repo/package：`pi-agent-colony`
+- [`docs/RENAMING-PLAN.md`](./docs/RENAMING-PLAN.md)
+- [`docs/RENAME-EXECUTION-CHECKLIST.md`](./docs/RENAME-EXECUTION-CHECKLIST.md)
 
 ## 新定位
 
