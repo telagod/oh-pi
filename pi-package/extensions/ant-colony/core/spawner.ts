@@ -1,29 +1,16 @@
 /**
- * 蚂蚁 Spawner — 每只蚂蚁是一个内嵌 AgentSession (SDK)
+ * 蚂蚁 Spawner — 每只蚂蚁通过 runtime adapter 驱动一个宿主 session
  *
- * 替代旧的 `pi --mode json` 子进程方案：
+ * 替代旧的 `pi --mode json` 子进程方案，同时避免 core 层直接依赖 Pi SDK：
  * - 零启动开销（同进程）
  * - 真实时 token 流（session.subscribe）
- * - 共享 auth/model registry
+ * - 宿主 auth/model/tool 细节由 adapter 封装
  */
 
-import {
-  createReadTool,
-  createBashTool,
-  createEditTool,
-  createWriteTool,
-  createGrepTool,
-  createFindTool,
-  createLsTool,
-  type AuthStorage,
-  type ModelRegistry,
-  type AgentSessionEvent,
-} from "@mariozechner/pi-coding-agent";
 import type { Ant, AntConfig, Task, AntStreamEvent } from "./types.js";
 import type { Nest } from "./nest.js";
 import { CASTE_PROMPTS, buildPrompt } from "./prompts.js";
 import { parseSubTasks, extractPheromones, type ParsedSubTask } from "./parser.js";
-import { createDefaultPiAdapter } from "../pi/adapter.js";
 import type { AntRuntimeAdapter, AntRuntimeSession } from "./runtime.js";
 import { makeAntId, makePheromoneId, makeTaskId } from "./ids.js";
 
@@ -37,19 +24,6 @@ export interface AntResult {
 
 export type { ParsedSubTask } from "./parser.js";
 export { makeAntId, makePheromoneId, makeTaskId } from "./ids.js";
-
-function createToolsForCaste(cwd: string, toolNames: string[]) {
-  const toolMap: Record<string, (cwd: string) => any> = {
-    read: createReadTool,
-    bash: createBashTool,
-    edit: createEditTool,
-    write: createWriteTool,
-    grep: createGrepTool,
-    find: createFindTool,
-    ls: createLsTool,
-  };
-  return toolNames.map(name => toolMap[name]?.(cwd)).filter(Boolean);
-}
 
 export async function runDrone(
   cwd: string,
@@ -102,11 +76,10 @@ export async function spawnAnt(
   antConfig: Omit<AntConfig, "systemPrompt">,
   signal?: AbortSignal,
   onStream?: (event: AntStreamEvent) => void,
-  authStorage?: AuthStorage,
-  modelRegistry?: ModelRegistry,
   piAdapter?: AntRuntimeAdapter,
 ): Promise<AntResult> {
   if (!antConfig.model) throw new Error("No model resolved for ant");
+  if (!piAdapter) throw new Error("No runtime adapter provided for ant");
   const antId = makeAntId(antConfig.caste);
   const ant: Ant = {
     id: antId,
@@ -138,18 +111,15 @@ export async function spawnAnt(
   const castePrompt = CASTE_PROMPTS[antConfig.caste];
   const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, effectiveMaxTurns, tandem);
 
-  const tools = createToolsForCaste(cwd, antConfig.tools);
-  const adapter = piAdapter ?? createDefaultPiAdapter({ authStorage, modelRegistry });
-
   let accumulatedText = "";
   let session: AntRuntimeSession | null = null;
 
   try {
-    session = await adapter.createSession({ cwd, model: antConfig.model, systemPrompt, tools });
+    session = await piAdapter.createSession({ cwd, model: antConfig.model, systemPrompt, toolNames: antConfig.tools });
 
-    session.subscribe((event: AgentSessionEvent) => {
-      if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-        const delta = event.assistantMessageEvent.delta;
+    session.subscribe((event) => {
+      if (event.type === "text_delta") {
+        const delta = event.delta;
         accumulatedText += delta;
         onStream?.({ antId, caste: antConfig.caste, taskId: task.id, delta, totalText: accumulatedText });
       }
@@ -165,12 +135,12 @@ export async function spawnAnt(
         }
       }
 
-      if (event.type === "message_end" && event.message?.role === "assistant") {
-        const u = (event.message as any).usage;
+      if (event.type === "assistant_message_end") {
+        const u = event.usage;
         if (u) {
           ant.usage.input += u.input || 0;
           ant.usage.output += u.output || 0;
-          ant.usage.cost += u.cost?.total || 0;
+          ant.usage.cost += u.costTotal || 0;
         }
       }
     });
@@ -199,9 +169,9 @@ export async function spawnAnt(
       for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg.role === "assistant") {
-          for (const part of msg.content) {
-            if ((part as any).type === "text") {
-              finalOutput = (part as any).text;
+          for (const part of msg.content || []) {
+            if (part.type === "text") {
+              finalOutput = part.text || "";
               break;
             }
           }

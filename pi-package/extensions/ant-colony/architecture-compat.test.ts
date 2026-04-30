@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
   AuthStorage: class {},
@@ -50,5 +52,17 @@ describe("ant-colony architecture compatibility", () => {
 
   it("root pi compatibility wrappers forward to pi modules", () => {
     expect(piCompat.createAntColonyExtension).toBe(pi.createAntColonyExtension);
+  });
+
+  it("keeps core free of direct Pi SDK imports", () => {
+    const coreDir = path.join(process.cwd(), "pi-package/extensions/ant-colony/core");
+    const files = fs.readdirSync(coreDir)
+      .filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+      .map(name => path.join(coreDir, name));
+
+    for (const file of files) {
+      const source = fs.readFileSync(file, "utf8");
+      expect(source, `${path.relative(process.cwd(), file)} should depend on core runtime abstractions, not Pi SDK`).not.toContain("@mariozechner/pi-coding-agent");
+    }
   });
 });

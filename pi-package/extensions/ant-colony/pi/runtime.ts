@@ -33,7 +33,6 @@ export async function runSyncColony(
       modelOverrides: params.modelOverrides,
       signal: signal ?? undefined,
       callbacks,
-      modelRegistry: params.modelRegistry,
       piAdapter: createDefaultPiAdapter({ modelRegistry: params.modelRegistry }),
     });
 
@@ -158,8 +157,6 @@ export function launchBackgroundColony(
     modelOverrides: params.modelOverrides,
     signal: abortController.signal,
     callbacks,
-    authStorage: undefined,
-    modelRegistry: params.modelRegistry,
     piAdapter: createDefaultPiAdapter({ modelRegistry: params.modelRegistry }),
   };
   colony.promise = resume ? resumeColony(colonyOpts) : runColony(colonyOpts);

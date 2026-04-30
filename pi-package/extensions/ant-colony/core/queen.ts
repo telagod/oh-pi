@@ -24,7 +24,6 @@ import { spawnAnt, runDrone } from "./spawner.js";
 import { makeTaskId, makePheromoneId, resetAntCounter } from "./ids.js";
 import { adapt, sampleSystem, defaultConcurrency } from "./concurrency.js";
 import { buildImportGraph, taskDependsOn, type ImportGraph } from "./deps.js";
-import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import type { AntRuntimeAdapter } from "./runtime.js";
 
 export interface QueenCallbacks {
@@ -48,8 +47,6 @@ export interface QueenOptions {
   modelOverrides?: ModelOverrides;
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
-  authStorage?: AuthStorage;
-  modelRegistry?: ModelRegistry;
   piAdapter?: AntRuntimeAdapter;
 }
 
@@ -275,8 +272,6 @@ interface WaveOptions {
   signal?: AbortSignal;
   callbacks: QueenCallbacks;
   emitSignal: (phase: ColonyState["status"], message: string) => void;
-  authStorage?: AuthStorage;
-  modelRegistry?: ModelRegistry;
   piAdapter?: AntRuntimeAdapter;
   importGraph?: ImportGraph;
 }
@@ -352,7 +347,7 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
       }
       const antPromise = caste === "drone"
         ? runDrone(cwd, nest, task)
-        : spawnAnt(cwd, nest, task, config, antSignal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry, opts.piAdapter);
+        : spawnAnt(cwd, nest, task, config, antSignal, callbacks.onAntStream, opts.piAdapter);
       let timeoutId: ReturnType<typeof setTimeout>;
       const result = await Promise.race([
         antPromise.finally(() => clearTimeout(timeoutId)),
@@ -610,8 +605,6 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
     nest, cwd: opts.cwd, signal, callbacks, emitSignal,
     currentModel: opts.currentModel,
     modelOverrides: opts.modelOverrides,
-    authStorage: opts.authStorage,
-    modelRegistry: opts.modelRegistry,
     piAdapter: opts.piAdapter,
   };
 
@@ -836,8 +829,6 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
     nest, cwd: opts.cwd, signal, callbacks, emitSignal,
     currentModel: opts.currentModel,
     modelOverrides: opts.modelOverrides,
-    authStorage: opts.authStorage,
-    modelRegistry: opts.modelRegistry,
     piAdapter: opts.piAdapter,
   };
 

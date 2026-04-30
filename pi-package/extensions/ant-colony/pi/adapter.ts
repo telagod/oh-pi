@@ -1,14 +1,28 @@
 import {
   AuthStorage,
   createAgentSession,
+  createReadTool,
+  createBashTool,
+  createEditTool,
+  createWriteTool,
+  createGrepTool,
+  createFindTool,
+  createLsTool,
   ModelRegistry,
   SessionManager,
   SettingsManager,
+  type AgentSessionEvent,
   type ResourceLoader,
   createExtensionRuntime,
 } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
-import type { AntRuntimeAdapter, AntRuntimeSession, CreateRuntimeSessionOptions } from "../core/runtime.js";
+import type {
+  AntRuntimeAdapter,
+  AntRuntimeEvent,
+  AntRuntimeSession,
+  AntRuntimeToolName,
+  CreateRuntimeSessionOptions,
+} from "../core/runtime.js";
 
 export type PiSession = AntRuntimeSession;
 export type CreatePiSessionOptions = CreateRuntimeSessionOptions;
@@ -48,6 +62,43 @@ function makeMinimalResourceLoader(systemPrompt: string): ResourceLoader {
   };
 }
 
+function createTools(cwd: string, toolNames: AntRuntimeToolName[]) {
+  const toolMap: Record<string, (cwd: string) => any> = {
+    read: createReadTool,
+    bash: createBashTool,
+    edit: createEditTool,
+    write: createWriteTool,
+    grep: createGrepTool,
+    find: createFindTool,
+    ls: createLsTool,
+  };
+  return toolNames.map(name => toolMap[name]?.(cwd)).filter(Boolean);
+}
+
+function toRuntimeEvent(event: AgentSessionEvent): AntRuntimeEvent | null {
+  if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+    return { type: "text_delta", delta: event.assistantMessageEvent.delta };
+  }
+
+  if (event.type === "turn_end") {
+    return { type: "turn_end" };
+  }
+
+  if (event.type === "message_end" && event.message?.role === "assistant") {
+    const usage = (event.message as any).usage;
+    return {
+      type: "assistant_message_end",
+      usage: usage ? {
+        input: usage.input || 0,
+        output: usage.output || 0,
+        costTotal: usage.cost?.total || 0,
+      } : undefined,
+    };
+  }
+
+  return null;
+}
+
 class DefaultPiAdapter implements AntRuntimeAdapter {
   private readonly authStorage: AuthStorage;
   private readonly modelRegistry: ModelRegistry;
@@ -74,7 +125,7 @@ class DefaultPiAdapter implements AntRuntimeAdapter {
       authStorage: this.authStorage,
       modelRegistry: this.modelRegistry,
       resourceLoader,
-      tools: options.tools,
+      tools: createTools(options.cwd, options.toolNames),
       sessionManager: SessionManager.inMemory(),
       settingsManager,
     });
@@ -82,7 +133,10 @@ class DefaultPiAdapter implements AntRuntimeAdapter {
     const session = created.session;
     return {
       subscribe(listener) {
-        session.subscribe(listener);
+        session.subscribe((event: AgentSessionEvent) => {
+          const runtimeEvent = toRuntimeEvent(event);
+          if (runtimeEvent) listener(runtimeEvent);
+        });
       },
       async prompt(prompt: string) {
         await session.prompt(prompt);

@@ -1,5 +1,8 @@
 node_modules/
 dist/
 .ant-colony/
+.pi/
+*.tgz
+progress.md
 *.tmp
 .ace-tool/

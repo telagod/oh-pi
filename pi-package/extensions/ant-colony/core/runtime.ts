@@ -1,18 +1,39 @@
-import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+export type AntRuntimeToolName = "read" | "bash" | "edit" | "write" | "grep" | "find" | "ls" | string;
+
+export interface AntRuntimeUsage {
+  input?: number;
+  output?: number;
+  costTotal?: number;
+}
+
+export type AntRuntimeEvent =
+  | { type: "text_delta"; delta: string }
+  | { type: "turn_end" }
+  | { type: "assistant_message_end"; usage?: AntRuntimeUsage };
+
+export interface AntRuntimeMessagePart {
+  type?: string;
+  text?: string;
+}
+
+export interface AntRuntimeMessage {
+  role?: string;
+  content?: AntRuntimeMessagePart[];
+}
 
 export interface AntRuntimeSession {
-  subscribe(listener: (event: AgentSessionEvent) => void): void;
+  subscribe(listener: (event: AntRuntimeEvent) => void): void;
   prompt(prompt: string): Promise<void>;
   abort(): Promise<void>;
   dispose(): Promise<void>;
-  getMessages(): any[];
+  getMessages(): AntRuntimeMessage[];
 }
 
 export interface CreateRuntimeSessionOptions {
   cwd: string;
   model: string;
   systemPrompt: string;
-  tools: any[];
+  toolNames: AntRuntimeToolName[];
 }
 
 export interface AntRuntimeAdapter {
