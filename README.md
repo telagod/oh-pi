@@ -483,6 +483,7 @@ Details:
 
 - [Release checklist](./RELEASE-CHECKLIST.md)
 - [Changelog](./CHANGELOG.md)
+- [Release notes for v0.1.86](./RELEASE-NOTES-v0.1.86.md)
 - [Release notes for v0.1.85](./RELEASE-NOTES-v0.1.85.md)
 
 ## Requirements

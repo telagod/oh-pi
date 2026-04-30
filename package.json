@@ -1,6 +1,6 @@
 {
   "name": "pi-agent-colony",
-  "version": "0.1.85",
+  "version": "0.1.86",
   "description": "Agent Colony for Pi — bootstrap and package distribution for a multi-agent Pi plugin for complex coding tasks.",
   "type": "module",
   "bin": {

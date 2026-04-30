@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.86 - Pi runtime boundary smoke hardening
+
+### Added
+- Host-shaped `runSyncColony` integration smoke covering the Pi runtime entry path, provider/model registry resolution, SDK-backed session lifecycle, and cancellation propagation.
+- Adapter smoke coverage for Pi tool creation, SDK event translation, session forwarding, and registry fallback behavior.
+- AbortSignal → runtime session `abort()` / `dispose()` smoke coverage for ant spawning.
+
+### Changed
+- Marked M2 Pi SDK compatibility smoke coverage complete in the roadmap.
+- Kept future real Pi host fixture checks as opt-in smoke, outside default CI.
+
+### Validation
+- `npm run build -- --pretty false`
+- `npm test -- --run`
+- **23/23 test files passed**
+- **245/245 tests passed**
+
 ## v0.1.85 - Ant Colony for Pi Beta architecture release
 
 ### Added

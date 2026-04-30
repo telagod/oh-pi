@@ -1,7 +1,7 @@
 # Ant Colony for Pi — Release Checklist
 
 Status: **Beta release candidate**
-Target package version: **v0.1.85**
+Target package version: **v0.1.86**
 
 ## 1. Product positioning
 
@@ -45,7 +45,7 @@ Target package version: **v0.1.85**
 - [x] `prepublishOnly` builds before publish
 - [x] README includes `pi install npm:oh-pi`
 - [x] README includes `npx oh-pi`
-- [ ] Final publish dry run (`npm pack`) checked
+- [x] Final publish dry run (`npm pack`) checked
 - [ ] Fresh-machine install smoke test checked
 
 ## 5. Provider / environment expectations
@@ -62,7 +62,7 @@ Target package version: **v0.1.85**
 - [x] Unit tests green
 - [x] Core structure tests green
 - [x] Compatibility wrapper tests green
-- [x] Current result: **21/21 test files, 235/235 tests passing**
+- [x] Current result: **23/23 test files, 245/245 tests passing**
 
 ## 7. Release artifacts
 
