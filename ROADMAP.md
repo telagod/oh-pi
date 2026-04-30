@@ -26,28 +26,34 @@
 
 ## 2) 近期里程碑
 
+> 当前快照（2026-04-30）：v0.1.85 处于 **Beta / Preview**。产品叙事与主体插件架构已基本落位；下一阶段重点是继续收紧 Pi SDK 边界与补证据型 benchmark。
+
 ### M1（1~2 周）：完成定位切换
-- [ ] README/文档首页重写为“蚁群插件优先”叙事
-- [ ] 新增 `docs/PRODUCT.md`，明确适用场景、非目标、用户边界
-- [ ] 将 installer / theme / preset / skills 从主卖点降级为辅助信息
-- [ ] 发布 2 分钟演示：单 agent 吃力 → colony 接管
+- [x] README/文档首页重写为“蚁群插件优先”叙事
+- [x] 新增 `docs/PRODUCT.md`，明确适用场景、非目标、用户边界
+- [x] 将 installer / theme / preset / skills 从主卖点降级为辅助信息
+- [x] 发布 2 分钟演示：单 agent 吃力 → colony 接管
 
 **成功指标**
 - 新访客能在 10 秒内理解“这是 pi 的蚁群插件”
 - 新访客能快速判断“这是否适合我的任务”
 
 ### M2（2~4 周）：插件边界稳定化
-- [ ] 引入 `PiAdapter`（anti-corruption layer）
-- [ ] `spawner` 仅依赖适配层，不再散落 SDK 调用
-- [ ] 将 colony runtime 与 pi UI/integration 分层
-- [ ] 增加 SDK 兼容性 smoke tests
+- [x] 引入 `PiAdapter`（anti-corruption layer）
+- [x] `spawner` 仅依赖适配层，不再散落 SDK 调用
+  - 进展：session 创建 / prompt / stream / abort / dispose、tool 创建、event 翻译已通过 `AntRuntimeAdapter` 边界承载。
+  - 进展：`runtime-integration.test.ts` 覆盖 `runSyncColony` → `createDefaultPiAdapter` → SDK-backed session 的宿主形态 smoke。
+- [x] 将 colony runtime 与 pi UI/integration 分层
+- [x] 增加 SDK 兼容性 smoke tests
+  - 进展：已有 `architecture-compat.test.ts` 覆盖兼容 wrapper 转发；`adapter.test.ts` 覆盖 provider/model registry resolution 与 Pi SDK event shape → `AntRuntimeEvent` 翻译；`spawner.test.ts` 覆盖 AbortSignal → runtime session abort / dispose；`runtime-integration.test.ts` 覆盖宿主入口下的 registry resolution、session lifecycle、cancellation propagation。
+  - 后续：有真实 Pi SDK fixture / host harness 后，再补一颗外部 opt-in smoke，不放进默认 CI。
 
 **成功指标**
 - 上游 SDK 小版本升级后，修复范围主要限制在适配层
 - colony 核心逻辑与 pi 宿主集成边界清晰
 
 ### M3（4~6 周）：状态与存储抽象
-- [ ] 抽象 `PheromoneStore` 接口（JSONL 默认实现）
+- [x] 抽象 `PheromoneStore` 接口（JSONL 默认实现）
 - [ ] 进一步抽象 run state / task state 存储边界
 - [ ] 信息素衰减策略改为可配置
 - [ ] 加入 SQLite 实现（可选）
